@@ -20,6 +20,8 @@ public:
 
     // function to read input .PLY
     bool read_ply(std::string filepath);
+    // function to read input .OBJ
+    bool read_obj(std::string filepath);
 
     // function to write output .JSON file
     void write_json(std::string filepath);

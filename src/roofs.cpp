@@ -9,18 +9,27 @@
 
 void roof::roof_obstacles()  {
     // CLEAN INPUT
+    // retrieve obj equation of planes
+
+    // Discard points too close to planes (parameter = distance treshold)
+
+    // CLUSTERING THE OBSTACLE POINTS
     // build k-d tree
 
-    // CLUSTERING
-    // build new k-d tree
-
     // CONVEX-HULLS
+    // Project conv-hull to planes
 
-    // Final map faces-vertices
+    // Compute roof plane area
+
+    // Compute area of projected obstacle(s) per plane (??)
+
+    // Deduce percentage off per roof plane
+
+    // Add/store this attribute value for each face
 }
 
 void roof::write_json(std::string filepath) {
-    // not done in cpp
+    // TODO: not done in cpp or use a library ?
 }
 
 bool roof::read_ply (std::string filepath) {
@@ -138,4 +147,8 @@ bool roof::read_ply (std::string filepath) {
     std::cout << "Number of points read from .ply file: " << _input_points.size() << std::endl;
 
     return true;
+}
+
+bool roof::read_obj (std::string filepath) {
+    //TODO (cf previous assignments?)
 }
