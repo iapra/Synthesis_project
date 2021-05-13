@@ -10,7 +10,23 @@ import scipy.spatial
 # kd = scipy.spatial.KDTree(list_pts)
 # d, i = kd.query(p, k=1)
 
-def detect_obstacles(output_file):
+def detect_obstacles(point_cloud, vertices, faces, output_file):
+    print(len(vertices))
+    print(len(faces))
+    # Loop through triangles and select points above it (in a local subset)
+    for triangle in faces:
+        assert (len(triangle) == 3)
     return
+    # Distance points to surface: discard points closer than .. threshold to define
+
+    # Obstacle points convex-hull
+
+    # Projection on mesh
+
+    # Solar potential area computation
+
+    # Store new attribute per triangle
+
+
 
 
