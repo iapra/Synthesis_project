@@ -3,6 +3,7 @@
 import math
 import numpy as np
 import scipy.spatial
+from plyfile import PlyData, PlyElement
 
 #-- to speed up the nearest neighbour us a kd-tree
 # https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html#scipy.spatial.KDTree
@@ -35,6 +36,8 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     kd_pc = scipy.spatial.KDTree(point_cloud)
     # Loop through triangles and select points above it (in a local subset)
     k = 0
+    all_subsets = []
+    tuples = []
     for triangle in faces:
         assert (len(triangle) == 3)
 
@@ -44,18 +47,30 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
         # Distance points to surface: discard points closer than .. threshold to define
         for point in point_cloud:
             # Points' subset
+            # print(point)
             p1 = vertices[triangle[0]-1]
             p2 = vertices[triangle[1]-1]
             p3 = vertices[triangle[2]-1]
             if isInside(p1, p2, p3, point): 
                 subset.append(point)
-                #inside += 1
+                # inside += 1
             else:
                 outside += 1
+        all_subsets.append(subset)
+
         k += 1
-        print ("For triangle number ", k, " Number of point in = ", len(subset), " Number of poiunts out = ", outside)
-    
-   
+        print("For triangle number ", k, " Number of point in = ", len(subset), " Number of points out = ", outside)
+
+        for i in subset:
+            x = tuple(i)
+            tuples.append(x)
+        a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
+        break
+
+    el = PlyElement.describe(a, 'vertex')
+
+    with open('points_test.ply', mode='wb') as f:
+        PlyData([el], text=True).write(f)
 
     # Obstacle points convex-hull
 
@@ -64,7 +79,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     # Solar potential area computation
 
     # Store new attribute per triangle
-
 
     return
 
