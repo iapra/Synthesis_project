@@ -53,25 +53,22 @@ def main():
     #     data_np[:, i] = data_pd[name]
 
     # THIS KEEPS ONLY x,y,z
-    data_np = np.zeros((data_pd.shape[0], 3), dtype=float)  # Initialize the array of stored data
+    point_cloud = np.zeros((data_pd.shape[0], 3), dtype=float)  # Initialize the array of stored data
     property_names = data[0].dtype.names
     for i, name in enumerate(property_names):
         if (i > 2): continue
-        data_np[:, i] = data_pd[name]
-    #print(data_np)
+        point_cloud[:, i] = data_pd[name]
+    #print(point_cloud)
 
     # -- READ OBJ: store the input in arrays
     read_obj(input_obj)
-    print(len(vertices))
-    print(len(faces))
-
 
     # -- READ json:
     # with open (input_json) as obj:
     #     data = json.loads(obj)
 
     # -- detect obstacles
-    roof_obstacles.detect_obstacles(output_file)
+    roof_obstacles.detect_obstacles(point_cloud, vertices, faces, output_file)
 
 
 if __name__ == '__main__':
