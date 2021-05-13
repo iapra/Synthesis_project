@@ -1,0 +1,3 @@
+/Volumes/I_APRA/00_Travail/Delft/TU DELFT Geomatics/Q4/GEO_SP/Roofs/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Volumes/I_APRA/00_Travail/Delft/TU DELFT Geomatics/Q4/GEO_SP/Roofs/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Volumes/I_APRA/00_Travail/Delft/TU DELFT Geomatics/Q4/GEO_SP/Roofs/cmake-build-debug/CMakeFiles/Roofs.dir
