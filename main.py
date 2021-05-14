@@ -43,6 +43,7 @@ def read_obj(in_file):
     if not len(faces) or not len(vertices):
         return None
 
+
 def read_json(in_file):
     f = open(in_file)
     data = json.load(f)   # returns JSON object as a dictionary
@@ -50,8 +51,12 @@ def read_json(in_file):
 
     for i in data["CityObjects"]:
         each_boundary = []
+        x = 0
         for lists in data["CityObjects"][i]["geometry"][2]["boundaries"][0]:
-            each_boundary.append(lists[0])
+            # print(lists[0])
+            if data["CityObjects"][i]["geometry"][2]["semantics"]["values"][0][x] == 1: # if it is a roof surface, it is added to the list
+                each_boundary.append(lists[0])
+            x += 1
         json_boundaries.append(each_boundary)
 
     for coord in data["vertices"]:
@@ -63,9 +68,6 @@ def read_json(in_file):
         vtx[1] = (vtx[1] * data["transform"]["scale"][1]) + data["transform"]["translate"][1]
         vtx[2] = (vtx[2] * data["transform"]["scale"][2]) + data["transform"]["translate"][2]
 
-    # print(json_vertices)
-    # # print(data["vertices"])
-    # print(len(json_boundaries))
     # return data
 
 
