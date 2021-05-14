@@ -54,56 +54,55 @@ def shortest_distance(p, equation_coef):
 
 
 def detect_obstacles(point_cloud, vertices, faces, output_file):
-    print(len(vertices))
-    print(len(faces))
+    print("Number of vertices: ", len(vertices))
+    print("Number of faces: ", len(faces))
 
     kd_pc = scipy.spatial.KDTree(point_cloud)
     # Loop through triangles and select points above it (in a local subset)
-    k = 1
+    k = 0
     all_subsets = []
     tuples = []
 
     for triangle in faces:
+        subset = []
+        obstacle_pts = []
+        too_high = []
+
         assert (len(triangle) == 3)
         p1 = vertices[triangle[0]-1]
         p2 = vertices[triangle[1]-1]
         p3 = vertices[triangle[2]-1]
-
-        subset = []
-        obstacle_pts = []
-        too_high = []
 
         for point in point_cloud:
             if isInside(p1, p2, p3, point): 
                 subset.append(point)
             
         # Triangle is vertical
-        if len(subset) == 0: continue
+        if len(subset) == 0: 
+            all_subsets.append(obstacle_pts)
+            continue
 
         else:
-        # Distance points to surface: discard points closer than .. threshold to define
+            threshold = 0.05
+        # Distance points to surface: discard points closer than threshold to define
             for p in subset:
-                threshold = 0.1
                 dist = shortest_distance(p, plane_equation(p1,p2,p3))
                 if dist > threshold:
                     obstacle_pts.append(p)
                 if dist > 4:
+                    # Triangle is probably the ground
                     too_high.append(p)
                     if len(too_high) > 2:
+                        obstacle_pts.clear()
                         break
                 else: continue
 
-        all_subsets.append(subset)
-        if len(obstacle_pts) == 0:
-            continue
-        if len(too_high) > 2:
-            print ("Triangle ", k, "--- This triangle is probably the ground !")
-        else:
-            print ("Triangle ", k, "--- Number of point in = ", len(subset), " - Number of obstacle points = ", len(obstacle_pts))
-        
+        all_subsets.append(obstacle_pts)
+        if len(obstacle_pts) != 0 and len(too_high) <= 3:
+            print ("Triangle id ", k, "--- Number of point in = ", len(subset), " - Number of obstacle points = ", len(obstacle_pts))
         k += 1
+        #print(all_subsets[-1])
 
-    # print(all_subsets)
     # turn the subset into a np.array for the write part
     #     for i in subset:
     #         x = tuple(i)
@@ -111,10 +110,11 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     #     a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
     #     break
 
-    # change the index to switch between subsets
-    for i in all_subsets[0]:
-        x = tuple(i)
-        tuples.append(x)
+    # visualise all points detected as obstacles
+    for obstacle_arr in all_subsets:
+        for obstacle_point in obstacle_arr:
+            point = tuple(obstacle_point)
+            tuples.append(point)
     a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
 
     # write PLY
