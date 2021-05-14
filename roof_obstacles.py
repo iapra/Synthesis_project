@@ -12,21 +12,51 @@ from plyfile import PlyData, PlyElement
 # kd = scipy.spatial.KDTree(list_pts)
 # d, i = kd.query(p, k=1)
 
-def area(p1,p2,p3):
+def area_2d(p1,p2,p3):
     return abs((p1[0] * (p2[1] - p3[1]) + p2[0] * (p3[1] - p1[1])
                 + p3[0] * (p1[1] - p2[1])) / 2.0)
 
 def isInside(p1,p2,p3, p):
 # A function to check whether point p lies inside the triangle p1,p2,p3
-    A = area (p1,p2,p3)
-    if A == 0: return False
-    A1 = area (p, p2, p3)
-    A2 = area (p1, p, p3)   
-    A3 = area (p1, p2, p)
+    A = area_2d (p1,p2,p3)
+    if A <= 0.05: return False
+    A1 = area_2d (p, p2, p3)
+    A2 = area_2d (p1, p, p3)   
+    A3 = area_2d (p1, p2, p)
     if(A == A1 + A2 + A3):
         return True
     else:
         return False
+
+#unit normal vector of plane defined by points a, b, and c
+def unit_normal(a, b, c):
+    x = np.linalg.det([[1,a[1],a[2]],
+                        [1,b[1],b[2]],
+                        [1,c[1],c[2]]])
+    y = np.linalg.det([[a[0],1,a[2]],
+                        [b[0],1,b[2]],
+                        [c[0],1,c[2]]])
+    z = np.linalg.det([[a[0],a[1],1],
+                        [b[0],b[1],1],
+                        [c[0],c[1],1]])
+    magnitude = (x**2 + y**2 + z**2)**.5
+    return (x/magnitude, y/magnitude, z/magnitude)
+
+#area of polygon poly (embedded in 3D)
+def area_polygon_3d(poly):
+    if len(poly) < 3: # not a plane - no area
+        return 0
+    total = [0, 0, 0]
+    N = len(poly)
+    for i in range(N):
+        vi1 = poly[i]
+        vi2 = poly[(i+1) % N]
+        prod = np.cross(vi1, vi2)
+        total[0] += prod[0]
+        total[1] += prod[1]
+        total[2] += prod[2]
+    result = np.dot(total, unit_normal(poly[0], poly[1], poly[2]))
+    return abs(result/2)
 
 def plane_equation (v1, v2, v3):
 # Function to find plane equation
@@ -52,6 +82,13 @@ def shortest_distance(p, equation_coef):
     #print(numerator/denum)
     return numerator/denum
 
+def get_height_difference(vertices):
+    z= []
+    for vertex in vertices:
+        z.append(vertex[2])
+    height_diff = max(z) - min(z)
+    return height_diff
+
 
 def detect_obstacles(point_cloud, vertices, faces, output_file):
     print("Number of vertices: ", len(vertices))
@@ -62,6 +99,11 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     k = 0
     all_subsets = []
     tuples = []
+    height_building = get_height_difference(vertices)
+    print("Building's height is ", height_building)
+
+    projected_area_2d = 0.00
+    area_3d = 0.00
 
     for triangle in faces:
         subset = []
@@ -81,27 +123,31 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
         if len(subset) == 0: 
             all_subsets.append(obstacle_pts)
             continue
-
+        
+        # Distance points to surface: discard points closer than threshold to define
         else:
             threshold = 0.05
-        # Distance points to surface: discard points closer than threshold to define
             for p in subset:
                 dist = shortest_distance(p, plane_equation(p1,p2,p3))
                 if dist > threshold:
                     obstacle_pts.append(p)
-                if dist > 4:
+                if dist > (height_building-2):
                     # Triangle is probably the ground
                     too_high.append(p)
-                    if len(too_high) > 2:
+                    if len(too_high) > 0:
                         obstacle_pts.clear()
                         break
                 else: continue
 
         all_subsets.append(obstacle_pts)
+
         if len(obstacle_pts) != 0 and len(too_high) <= 3:
-            print ("Triangle id ", k, "--- Number of point in = ", len(subset), " - Number of obstacle points = ", len(obstacle_pts))
+            projected_area_2d += area_2d(p1,p2,p3)
+            area_3d += area_polygon_3d([p1,p2,p3])
+            #print ("Triangle id ", k, "--- Number of point in = ", len(subset), " - Number of obstacle points = ", len(obstacle_pts))
         k += 1
-        #print(all_subsets[-1])
+    print("Projected roof area in 2D: ", projected_area_2d)
+    print("Roof area in 3D: ", area_3d)
 
     # turn the subset into a np.array for the write part
     #     for i in subset:
@@ -111,11 +157,14 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     #     break
 
     # visualise all points detected as obstacles
+    count = 0
     for obstacle_arr in all_subsets:
         for obstacle_point in obstacle_arr:
+            count += 1
             point = tuple(obstacle_point)
             tuples.append(point)
     a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
+    print("Number of ostacle points found: ", count)
 
     # write PLY
     el = PlyElement.describe(a, 'vertex')
