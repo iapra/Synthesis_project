@@ -93,13 +93,10 @@ def main():
 
     # -- READ OBJ: store the input in arrays
     read_obj(input_obj)
-    print(read_json(input_json))
-
-    # -- READ json:
-    # with open (input_json) as obj:
-    #     data = json.loads(obj)
+    #read_json(input_json)
 
     # -- detect obstacles
+    #roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file)
     roof_obstacles.detect_obstacles(point_cloud, vertices, faces, output_file)
 
 

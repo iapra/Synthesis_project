@@ -7,11 +7,13 @@ import scipy.spatial
 from plyfile import PlyData, PlyElement
 #from sklearn.cluster import KMeans
 
-from numpy import unique
-from numpy import where
-from sklearn.datasets import make_classification
-from sklearn.cluster import Birch
-from matplotlib import pyplot
+# from numpy import unique
+# from numpy import where
+# from sklearn.datasets import make_classification
+# from sklearn.cluster import Birch
+# from matplotlib import pyplot
+
+from collections import deque
 
 #-- to speed up the nearest neighbour us a kd-tree
 # https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html#scipy.spatial.KDTree
@@ -134,15 +136,13 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
         
         # Distance points to surface: discard points closer than threshold to define
         else:
-            threshold = 0.5
+            threshold = 0.08
             for p in subset:
                 dist = shortest_distance(p, plane_equation(p1,p2,p3))
                 if dist > threshold:
                     obstacle_triangle.append(p)
                 if dist > (height_building-2):
                     # Triangle is probably the ground
-                    # too_high.append(p)
-                    # break
                     too_high.append(p)
                     if len(too_high) > 0:
                         obstacle_triangle.clear()
@@ -162,12 +162,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     print("Projected roof area in 2D: ", projected_area_2d)
     print("Roof area in 3D: ", area_3d)
 
-    # turn the subset into a np.array for the write part
-    #     for i in subset:
-    #         x = tuple(i)
-    #         tuples.append(x)
-    #     a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
-    #     break
 
     # visualise all points detected as obstacles
     for p in obstacle_pts:
@@ -175,7 +169,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
         point = tuple(p)
         tuples.append(point)
     a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
-    print("Number of ostacle points found: ", len(obstacle_pts))
+    print("Number of obstacle points found: ", len(obstacle_pts))
 
     # write PLY
     el = PlyElement.describe(a, 'vertex')
@@ -183,35 +177,79 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     with open('points_test.ply', mode='wb') as f:
         PlyData([el], text=True).write(f)
 
-    # Clustering
-    kd_pc = scipy.spatial.KDTree(obstacle_pts)
-    # data = np.vstack(obstacle_pts).T
-    # clustering = KMeans(n_clusters=5, random_state=170)
-    # km = clustering.fit_predict(data)
-    # for ele in km:
-    #     print (ele)
 
-    # define dataset
-    nb_cluster = round(len(obstacle_pts)/5)
-    X, _ = make_classification(n_samples=len(obstacle_pts), 
-            n_features=nb_cluster, n_informative=nb_cluster, 
-            n_redundant=0, n_clusters_per_class=1)
-    # define the model
-    model = Birch(threshold=0.01, n_clusters=nb_cluster)
-    # fit the model
-    model.fit(X)
-    # assign a cluster to each example
-    yhat = model.predict(X)
-    # retrieve unique clusters
-    clusters = unique(yhat)
-    # create scatter plot for samples from each cluster
-    for cluster in clusters:
-        # get row indexes for samples with this cluster
-        row_ix = where(yhat == cluster)
-        # create scatter of these samples
-        pyplot.scatter(X[:,0], X[:,1], c=yhat)
-    # show the plot
-    pyplot.show()
+    # Manual clustering
+    kd = scipy.spatial.KDTree(obstacle_pts)
+    tops_id = set()
+    tops = []
+    stack = deque()
+    stacked_points_id = set()
+
+    pid = 0
+    for p in obstacle_pts:
+        stacked_points_id.add(pid)
+        stack.append(pid)
+        top = pid
+        while (len(stack) > 0):
+            assert(len(stack) == 1)
+            current_id = stack[-1]
+            stack.pop()
+
+            # We get the higher point in the radius search
+            higher_id = current_id
+            subset_id = kd.query_ball_point(obstacle_pts[current_id], r = 5)
+            #print(len(subset_id))
+
+            for id in subset_id:
+                if obstacle_pts[id][2] > obstacle_pts[higher_id][2]:
+                    higher_id = id
+            
+            if higher_id not in stacked_points_id:
+                stack.append(higher_id)
+                stacked_points_id.add(higher_id)
+            else: 
+                top = higher_id
+        pid += 1
+        # We add the top to the top of the obstacles
+        if top not in tops_id:
+            tops_id.add(top)
+            tops.append(obstacle_pts[top])
+        else: continue
+
+    print("Number of clusters: ", len(tops))
+
+    # KD tree for the tops
+    kd_tops = scipy.spatial.KDTree(tops)
+
+    # search for each point its closest top-point
+    dict_obstacles = {}
+    for id in range(len(tops)):
+        dict_obstacles[str(id)] = list()
+    id_ = 0
+    for p in obstacle_pts:
+        # Nearest neighbour search
+        dist, id = kd_tops.query(p, k=1)
+        dict_obstacles[str(id)].append(id_)
+        id_ += 1
+
+    # Check and visualise clusters
+    file = "out_test.txt"
+    with open(file, "w") as f:
+        f.write("x y z obstacle \n")
+        count = 0
+        for key in dict_obstacles:
+            for val in dict_obstacles[key]:
+                f.write(str(obstacle_pts[val][0]))
+                f.write(" ")
+                f.write(str(obstacle_pts[val][1]))
+                f.write(" ")
+                f.write(str(obstacle_pts[val][2]))
+                f.write(" ")
+                f. write(key)
+                f.write("\n")
+            count += 1
+        f.close()
+
 
     # Obstacle points convex-hull
 
