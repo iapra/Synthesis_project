@@ -19,6 +19,7 @@ def isInside(p1,p2,p3, p):
 # lies inside the triangle formed by
 # A(x1, y1), B(x2, y2) and C(x3, y3)
     A = area (p1,p2,p3)
+    if A == 0: return False
     A1 = area (p, p2, p3)
     A2 = area (p1, p, p3)   
     A3 = area (p1, p2, p)
@@ -36,12 +37,10 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     # Loop through triangles and select points above it (in a local subset)
     k = 0
     for triangle in faces:
+        k += 1
         assert (len(triangle) == 3)
 
-        #inside = 0 
-        outside = 0
         subset = []
-        # Distance points to surface: discard points closer than .. threshold to define
         for point in point_cloud:
             # Points' subset
             p1 = vertices[triangle[0]-1]
@@ -49,11 +48,15 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
             p3 = vertices[triangle[2]-1]
             if isInside(p1, p2, p3, point): 
                 subset.append(point)
-                #inside += 1
-            else:
-                outside += 1
-        k += 1
-        print ("For triangle number ", k, " Number of point in = ", len(subset), " Number of poiunts out = ", outside)
+        
+        # Triangle is vertical
+        if len(subset) == 0: continue
+        else:
+            print ("For triangle number ", k, " Number of point in = ", len(subset))
+            # Distance points to surface: discard points closer than .. threshold to define
+            for p in subset:
+                # COMPUTE DISTANCE HERE
+                continue
     
    
 
