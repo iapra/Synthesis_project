@@ -56,17 +56,29 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
                 # inside += 1
             else:
                 outside += 1
+
+        # if len(subset) != 0:
+        #     all_subsets.append(subset)
         all_subsets.append(subset)
 
         k += 1
         print("For triangle number ", k, " Number of point in = ", len(subset), " Number of points out = ", outside)
 
-        for i in subset:
-            x = tuple(i)
-            tuples.append(x)
-        a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
-        break
+    # print(all_subsets)
+    # turn the subset into a np.array for the write part
+    #     for i in subset:
+    #         x = tuple(i)
+    #         tuples.append(x)
+    #     a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
+    #     break
 
+    # change the index to switch between subsets
+    for i in all_subsets[0]:
+        x = tuple(i)
+        tuples.append(x)
+    a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
+
+    # write PLY
     el = PlyElement.describe(a, 'vertex')
 
     with open('points_test.ply', mode='wb') as f:
