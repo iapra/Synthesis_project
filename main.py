@@ -56,7 +56,13 @@ def read_json(in_file):
 
     for coord in data["vertices"]:
         json_vertices.append(coord)
-    # print(json_vertices[13281])
+
+    # Add transform to json_vertices
+    for vtx in json_vertices:
+        vtx[0] = (vtx[0] * data["transform"]["scale"][0]) + data["transform"]["translate"][0]
+        vtx[1] = (vtx[1] * data["transform"]["scale"][1]) + data["transform"]["translate"][1]
+        vtx[2] = (vtx[2] * data["transform"]["scale"][2]) + data["transform"]["translate"][2]
+
     # print(json_vertices)
     # # print(data["vertices"])
     # print(len(json_boundaries))
