@@ -2,6 +2,7 @@
 
 import math
 import numpy as np
+from numpy.lib.function_base import corrcoef
 import scipy.spatial
 
 #-- to speed up the nearest neighbour us a kd-tree
@@ -15,9 +16,7 @@ def area(p1,p2,p3):
                 + p3[0] * (p1[1] - p2[1])) / 2.0)
 
 def isInside(p1,p2,p3, p):
-# A function to check whether point P(x, y)
-# lies inside the triangle formed by
-# A(x1, y1), B(x2, y2) and C(x3, y3)
+# A function to check whether point p lies inside the triangle p1,p2,p3
     A = area (p1,p2,p3)
     if A == 0: return False
     A1 = area (p, p2, p3)
@@ -28,6 +27,30 @@ def isInside(p1,p2,p3, p):
     else:
         return False
 
+def plane_equation (v1, v2, v3):
+# Function to find plane equation
+    p1 = np.array([v1[0], v1[1], v1[2]])
+    p2 = np.array([v2[0], v2[1], v2[2]])
+    p3 = np.array([v3[0], v3[1], v3[2]])
+    v1 = p3 - p1
+    v2 = p2 - p1
+    # the cross product is a vector normal to the plane
+    cp = np.cross(v1, v2)
+    a, b, c = cp
+    # This evaluates a * x3 + b * y3 + c * z3 which equals d
+    d = np.dot(cp, p3)
+    equation_coef = [a, b, c, d]
+    return equation_coef
+
+def shortest_distance(p, equation_coef):
+# Function to find distance from point p to plane
+    a, b, c, d = equation_coef[0], equation_coef[1], equation_coef[2], -equation_coef[3]
+    x, y, z = p[0], p[1], p[2]
+    numerator = abs((a * x + b * y + c * z + d))
+    denum = (math.sqrt(a * a + b * b + c * c))
+    #print(numerator/denum)
+    return numerator/denum
+
 
 def detect_obstacles(point_cloud, vertices, faces, output_file):
     print(len(vertices))
@@ -35,30 +58,45 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
 
     kd_pc = scipy.spatial.KDTree(point_cloud)
     # Loop through triangles and select points above it (in a local subset)
-    k = 0
+    k = 1
     for triangle in faces:
-        k += 1
         assert (len(triangle) == 3)
+        p1 = vertices[triangle[0]-1]
+        p2 = vertices[triangle[1]-1]
+        p3 = vertices[triangle[2]-1]
 
         subset = []
+        obstacle_pts = []
+        too_high = []
         for point in point_cloud:
             # Points' subset
-            p1 = vertices[triangle[0]-1]
-            p2 = vertices[triangle[1]-1]
-            p3 = vertices[triangle[2]-1]
             if isInside(p1, p2, p3, point): 
                 subset.append(point)
         
         # Triangle is vertical
         if len(subset) == 0: continue
         else:
-            print ("For triangle number ", k, " Number of point in = ", len(subset))
             # Distance points to surface: discard points closer than .. threshold to define
             for p in subset:
                 # COMPUTE DISTANCE HERE
-                continue
-    
-   
+                threshold = 0.1
+                dist = shortest_distance(p, plane_equation(p1,p2,p3))
+                if dist > threshold:
+                    obstacle_pts.append(p)
+                if dist > 4:
+                    too_high.append(p)
+                    if len(too_high) > 2:
+                        break
+                else: continue
+
+        if len(obstacle_pts) == 0:
+            continue
+        if len(too_high) > 2:
+            print ("Triangle ", k, "--- This triangle is probably the ground !")
+        else:
+            print ("Triangle ", k, "--- Number of point in = ", len(subset), " - Number of obstacle points = ", len(obstacle_pts))
+        
+        k += 1
 
     # Obstacle points convex-hull
 
