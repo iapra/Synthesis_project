@@ -5,17 +5,20 @@ from plyfile import PlyData, PlyElement
 import numpy as np
 import pandas as pd
 import pywavefront
-
+import json
 # -- *all* code goes into 'roof_obstacles'
 import roof_obstacles
 
 input_ply = "./data/one_building.ply"
 input_obj = "./data/3d_one_building.obj"
 output_file = "./data/out.json"
+input_json = "./data/3dbag_v21031_7425c21b_5910.json"
 
 # Structures to get the input elements:
 vertices = []
 faces = []
+json_boundaries = []
+json_vertices = []
 
 def yield_file(in_file):
     f = open(in_file)
@@ -40,6 +43,26 @@ def read_obj(in_file):
     if not len(faces) or not len(vertices):
         return None
 
+def read_json(in_file):
+    f = open(in_file)
+    data = json.load(f)   # returns JSON object as a dictionary
+    f.close()
+
+    for i in data["CityObjects"]:
+        each_boundary = []
+        for lists in data["CityObjects"][i]["geometry"][2]["boundaries"][0]:
+            each_boundary.append(lists[0])
+        json_boundaries.append(each_boundary)
+
+    for coord in data["vertices"]:
+        json_vertices.append(coord)
+    # print(json_vertices[13281])
+    # print(json_vertices)
+    # # print(data["vertices"])
+    # print(len(json_boundaries))
+    # return data
+
+
 def main():
     # -- READ PLY: store the input 3D points in np array
     plydata = PlyData.read(input_ply)                       # read file
@@ -58,10 +81,11 @@ def main():
     for i, name in enumerate(property_names):
         if (i > 2): continue
         point_cloud[:, i] = data_pd[name]
-    #print(point_cloud)
+
 
     # -- READ OBJ: store the input in arrays
     read_obj(input_obj)
+    print(read_json(input_json))
 
     # -- READ json:
     # with open (input_json) as obj:
