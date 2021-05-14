@@ -5,6 +5,13 @@ import numpy as np
 from numpy.lib.function_base import corrcoef
 import scipy.spatial
 from plyfile import PlyData, PlyElement
+#from sklearn.cluster import KMeans
+
+from numpy import unique
+from numpy import where
+from sklearn.datasets import make_classification
+from sklearn.cluster import Birch
+from matplotlib import pyplot
 
 #-- to speed up the nearest neighbour us a kd-tree
 # https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html#scipy.spatial.KDTree
@@ -94,10 +101,11 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     print("Number of vertices: ", len(vertices))
     print("Number of faces: ", len(faces))
 
-    kd_pc = scipy.spatial.KDTree(point_cloud)
+    # ALL FOLLOWING SHOULD BE FOR 1 BUILDING // TO ADAPT
     # Loop through triangles and select points above it (in a local subset)
     k = 0
-    all_subsets = []
+    #all_subsets = []
+    obstacle_pts = []
     tuples = []
     height_building = get_height_difference(vertices)
     print("Building's height is ", height_building)
@@ -107,8 +115,8 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
 
     for triangle in faces:
         subset = []
-        obstacle_pts = []
         too_high = []
+        obstacle_triangle = [] # this helps us to find if the triangle is roof or not
 
         assert (len(triangle) == 3)
         p1 = vertices[triangle[0]-1]
@@ -121,27 +129,32 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
             
         # Triangle is vertical
         if len(subset) == 0: 
-            all_subsets.append(obstacle_pts)
+            #all_subsets.append(obstacle_pts)
             continue
         
         # Distance points to surface: discard points closer than threshold to define
         else:
-            threshold = 0.05
+            threshold = 0.5
             for p in subset:
                 dist = shortest_distance(p, plane_equation(p1,p2,p3))
                 if dist > threshold:
-                    obstacle_pts.append(p)
+                    obstacle_triangle.append(p)
                 if dist > (height_building-2):
                     # Triangle is probably the ground
+                    # too_high.append(p)
+                    # break
                     too_high.append(p)
                     if len(too_high) > 0:
-                        obstacle_pts.clear()
+                        obstacle_triangle.clear()
                         break
                 else: continue
 
-        all_subsets.append(obstacle_pts)
+        for p in obstacle_triangle:
+            obstacle_pts.append(p)
 
-        if len(obstacle_pts) != 0 and len(too_high) <= 3:
+        #all_subsets.append(obstacle_pts)
+
+        if len(obstacle_triangle) != 0 and len(too_high) == 0:
             projected_area_2d += area_2d(p1,p2,p3)
             area_3d += area_polygon_3d([p1,p2,p3])
             #print ("Triangle id ", k, "--- Number of point in = ", len(subset), " - Number of obstacle points = ", len(obstacle_pts))
@@ -157,14 +170,12 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     #     break
 
     # visualise all points detected as obstacles
-    count = 0
-    for obstacle_arr in all_subsets:
-        for obstacle_point in obstacle_arr:
-            count += 1
-            point = tuple(obstacle_point)
-            tuples.append(point)
+    for p in obstacle_pts:
+        #for obstacle_point in obstacle_arr:
+        point = tuple(p)
+        tuples.append(point)
     a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
-    print("Number of ostacle points found: ", count)
+    print("Number of ostacle points found: ", len(obstacle_pts))
 
     # write PLY
     el = PlyElement.describe(a, 'vertex')
@@ -172,13 +183,43 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     with open('points_test.ply', mode='wb') as f:
         PlyData([el], text=True).write(f)
 
+    # Clustering
+    kd_pc = scipy.spatial.KDTree(obstacle_pts)
+    # data = np.vstack(obstacle_pts).T
+    # clustering = KMeans(n_clusters=5, random_state=170)
+    # km = clustering.fit_predict(data)
+    # for ele in km:
+    #     print (ele)
+
+    # define dataset
+    nb_cluster = round(len(obstacle_pts)/5)
+    X, _ = make_classification(n_samples=len(obstacle_pts), 
+            n_features=nb_cluster, n_informative=nb_cluster, 
+            n_redundant=0, n_clusters_per_class=1)
+    # define the model
+    model = Birch(threshold=0.01, n_clusters=nb_cluster)
+    # fit the model
+    model.fit(X)
+    # assign a cluster to each example
+    yhat = model.predict(X)
+    # retrieve unique clusters
+    clusters = unique(yhat)
+    # create scatter plot for samples from each cluster
+    for cluster in clusters:
+        # get row indexes for samples with this cluster
+        row_ix = where(yhat == cluster)
+        # create scatter of these samples
+        pyplot.scatter(X[:,0], X[:,1], c=yhat)
+    # show the plot
+    pyplot.show()
+
     # Obstacle points convex-hull
 
-    # Projection on mesh
+    # Area calculation
 
     # Solar potential area computation
 
-    # Store new attribute per triangle
+    # Store new attribute per building
 
     return
 
