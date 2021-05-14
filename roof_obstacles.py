@@ -4,6 +4,7 @@ import math
 import numpy as np
 from numpy.lib.function_base import corrcoef
 import scipy.spatial
+from plyfile import PlyData, PlyElement
 
 #-- to speed up the nearest neighbour us a kd-tree
 # https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html#scipy.spatial.KDTree
@@ -59,6 +60,9 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     kd_pc = scipy.spatial.KDTree(point_cloud)
     # Loop through triangles and select points above it (in a local subset)
     k = 1
+    all_subsets = []
+    tuples = []
+
     for triangle in faces:
         assert (len(triangle) == 3)
         p1 = vertices[triangle[0]-1]
@@ -68,17 +72,17 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
         subset = []
         obstacle_pts = []
         too_high = []
+
         for point in point_cloud:
-            # Points' subset
             if isInside(p1, p2, p3, point): 
                 subset.append(point)
-        
+            
         # Triangle is vertical
         if len(subset) == 0: continue
+
         else:
-            # Distance points to surface: discard points closer than .. threshold to define
+        # Distance points to surface: discard points closer than .. threshold to define
             for p in subset:
-                # COMPUTE DISTANCE HERE
                 threshold = 0.1
                 dist = shortest_distance(p, plane_equation(p1,p2,p3))
                 if dist > threshold:
@@ -89,6 +93,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
                         break
                 else: continue
 
+        all_subsets.append(subset)
         if len(obstacle_pts) == 0:
             continue
         if len(too_high) > 2:
@@ -98,6 +103,26 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
         
         k += 1
 
+    # print(all_subsets)
+    # turn the subset into a np.array for the write part
+    #     for i in subset:
+    #         x = tuple(i)
+    #         tuples.append(x)
+    #     a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
+    #     break
+
+    # change the index to switch between subsets
+    for i in all_subsets[0]:
+        x = tuple(i)
+        tuples.append(x)
+    a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
+
+    # write PLY
+    el = PlyElement.describe(a, 'vertex')
+
+    with open('points_test.ply', mode='wb') as f:
+        PlyData([el], text=True).write(f)
+
     # Obstacle points convex-hull
 
     # Projection on mesh
@@ -105,7 +130,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     # Solar potential area computation
 
     # Store new attribute per triangle
-
 
     return
 
