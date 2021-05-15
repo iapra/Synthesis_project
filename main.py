@@ -44,7 +44,6 @@ def read_obj(in_file):
     if not len(faces) or not len(vertices):
         return None
 
-
 def read_json(in_file):
     f = open(in_file)
     data = json.load(f)   # returns JSON object as a dictionary
@@ -68,9 +67,6 @@ def read_json(in_file):
         vtx[0] = (vtx[0] * data["transform"]["scale"][0]) + data["transform"]["translate"][0]
         vtx[1] = (vtx[1] * data["transform"]["scale"][1]) + data["transform"]["translate"][1]
         vtx[2] = (vtx[2] * data["transform"]["scale"][2]) + data["transform"]["translate"][2]
-
-    # return data
-
 
 def main():
     # -- READ PLY: store the input 3D points in np array
