@@ -162,20 +162,19 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
         for triangle in building:
             #print(triangle)
             subset = []
-            too_high = []
-            obstacle_triangle = [] # this helps us to find if the triangle is roof or not
 
             assert (len(triangle) == 3)
-            p1 = vertices[triangle[0]-1]
-            p2 = vertices[triangle[1]-1]
-            p3 = vertices[triangle[2]-1]
+            p1 = vertices[triangle[0]]
+            p2 = vertices[triangle[1]]
+            p3 = vertices[triangle[2]]
 
             for point in point_cloud:
                 if isInside(p1, p2, p3, point): 
                     subset.append(point)
                 
-            # Triangle is vertical
+            # Triangle is vertical?
             if len(subset) == 0: 
+                print("zero !")
                 continue
             
             # Distance points to surface: discard points closer than threshold to define
@@ -184,23 +183,13 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
                 for p in subset:
                     dist = shortest_distance(p, plane_equation(p1,p2,p3))
                     if dist > threshold:
-                        obstacle_triangle.append(p)
-                    if dist > (height_building-2):
-                        # Triangle is probably the ground
-                        too_high.append(p)
-                        if len(too_high) > 0:
-                            obstacle_triangle.clear()
-                            break
+                        obstacle_building.append(p)
+                        obstacle_pts.append(p)
                     else: continue
 
-            for p in obstacle_triangle:
-                obstacle_pts.append(p)
-
-
-            if len(obstacle_triangle) != 0 and len(too_high) == 0:
-                projected_area_2d += area_2d(p1,p2,p3)
-                area_3d += area_polygon_3d([p1,p2,p3])
-                #print ("Triangle id ", k, "--- Number of point in = ", len(subset), " - Number of obstacle points = ", len(obstacle_pts))
+            projected_area_2d += area_2d(p1,p2,p3)
+            area_3d += area_polygon_3d([p1,p2,p3])
+            #print ("Triangle id ", k, "--- Number of point in = ", len(subset), " - Number of obstacle points = ", len(obstacle_pts))
             k += 1
         print("Projected roof area in 2D: ", projected_area_2d)
         print("Roof area in 3D: ", area_3d)
