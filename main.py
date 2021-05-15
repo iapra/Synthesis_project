@@ -9,10 +9,11 @@ import json
 # -- *all* code goes into 'roof_obstacles'
 import roof_obstacles
 
-input_ply = "./data/one_building.ply"
+input_ply = "./data/extract.ply"
+#input_ply = "./data/one_building.ply"
 input_obj = "./data/3d_one_building.obj"
 output_file = "./data/out.json"
-input_json = "./data/3dbag_v21031_7425c21b_5910.json"
+input_json = "./data/extract.json"
 
 # Structures to get the input elements:
 vertices = []
@@ -92,12 +93,12 @@ def main():
 
 
     # -- READ OBJ: store the input in arrays
-    read_obj(input_obj)
-    #read_json(input_json)
+    #read_obj(input_obj)
+    read_json(input_json)
 
     # -- detect obstacles
     #roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file)
-    roof_obstacles.detect_obstacles(point_cloud, vertices, faces, output_file)
+    roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file)
 
 
 if __name__ == '__main__':

@@ -5,14 +5,6 @@ import numpy as np
 from numpy.lib.function_base import corrcoef
 import scipy.spatial
 from plyfile import PlyData, PlyElement
-#from sklearn.cluster import KMeans
-
-# from numpy import unique
-# from numpy import where
-# from sklearn.datasets import make_classification
-# from sklearn.cluster import Birch
-# from matplotlib import pyplot
-
 from collections import deque
 
 #-- to speed up the nearest neighbour us a kd-tree
@@ -98,6 +90,54 @@ def get_height_difference(vertices):
     height_diff = max(z) - min(z)
     return height_diff
 
+def write_obj(vertices, faces, fileout):
+    vertices_out = []
+    faces_out = []
+    countf = 1
+    for building in faces:
+        for f in building:
+           # print(vertices[f[0]][0])
+            #vertices_list = (vertices[f[0]][0], vertices[f[0]][1], vertices[f[0]][2])
+            vertices_out.append(vertices[f[0]])
+            vertices_out.append(vertices[f[1]])
+            vertices_out.append(vertices[f[2]])
+            face = [countf, countf+1, countf+2]
+            faces_out.append(face)
+            countf += 3
+    # write file
+    with open(fileout, "w") as file:
+        for v in vertices_out:
+            file.write("v ")
+            file.write(str(v[0]))
+            file.write(" ")
+            file.write(str(v[1]))
+            file.write(" ")
+            file.write(str(v[2]))
+            file.write("\n")
+        file.write("Oo\n")
+        for f in faces_out:
+            file.write("f ")
+            file.write(str(f[0]))
+            file.write(" ")
+            file.write(str(f[1]))
+            file.write(" ")
+            file.write(str(f[2]))
+            file.write("\n")
+        file.close()
+
+def write_ply (obstacle_pts, fileout):
+    tuples = []
+    for p in obstacle_pts:
+            #for obstacle_point in obstacle_arr:
+            point = tuple(p)
+            tuples.append(point)
+    a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
+    print("Number of obstacle points found: ", len(obstacle_pts))
+    # write PLY
+    el = PlyElement.describe(a, 'vertex')
+    with open(fileout, mode='wb') as f:
+        PlyData([el], text=True).write(f)
+
 
 def detect_obstacles(point_cloud, vertices, faces, output_file):
     print("Number of vertices: ", len(vertices))
@@ -106,158 +146,152 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     # ALL FOLLOWING SHOULD BE FOR 1 BUILDING // TO ADAPT
     # Loop through triangles and select points above it (in a local subset)
     k = 0
-    #all_subsets = []
     obstacle_pts = []
-    tuples = []
     height_building = get_height_difference(vertices)
     print("Building's height is ", height_building)
 
     projected_area_2d = 0.00
     area_3d = 0.00
 
-    for triangle in faces:
-        subset = []
-        too_high = []
-        obstacle_triangle = [] # this helps us to find if the triangle is roof or not
+    # ROOF EXPORT IN OBJ FOR VISUALISATION: Check that faces are only roofs and LOD2
+    write_obj(vertices, faces, './fileout/roofs_out.obj')
 
-        assert (len(triangle) == 3)
-        p1 = vertices[triangle[0]-1]
-        p2 = vertices[triangle[1]-1]
-        p3 = vertices[triangle[2]-1]
+    # OBSTACLE EXTRACTION
+    for building in faces:
+        obstacle_building = []
+        for triangle in building:
+            #print(triangle)
+            subset = []
+            too_high = []
+            obstacle_triangle = [] # this helps us to find if the triangle is roof or not
 
-        for point in point_cloud:
-            if isInside(p1, p2, p3, point): 
-                subset.append(point)
+            assert (len(triangle) == 3)
+            p1 = vertices[triangle[0]-1]
+            p2 = vertices[triangle[1]-1]
+            p3 = vertices[triangle[2]-1]
+
+            for point in point_cloud:
+                if isInside(p1, p2, p3, point): 
+                    subset.append(point)
+                
+            # Triangle is vertical
+            if len(subset) == 0: 
+                continue
             
-        # Triangle is vertical
-        if len(subset) == 0: 
-            #all_subsets.append(obstacle_pts)
-            continue
-        
-        # Distance points to surface: discard points closer than threshold to define
-        else:
-            threshold = 0.08
-            for p in subset:
-                dist = shortest_distance(p, plane_equation(p1,p2,p3))
-                if dist > threshold:
-                    obstacle_triangle.append(p)
-                if dist > (height_building-2):
-                    # Triangle is probably the ground
-                    too_high.append(p)
-                    if len(too_high) > 0:
-                        obstacle_triangle.clear()
-                        break
-                else: continue
+            # Distance points to surface: discard points closer than threshold to define
+            else:
+                threshold = 0.08
+                for p in subset:
+                    dist = shortest_distance(p, plane_equation(p1,p2,p3))
+                    if dist > threshold:
+                        obstacle_triangle.append(p)
+                    if dist > (height_building-2):
+                        # Triangle is probably the ground
+                        too_high.append(p)
+                        if len(too_high) > 0:
+                            obstacle_triangle.clear()
+                            break
+                    else: continue
 
-        for p in obstacle_triangle:
-            obstacle_pts.append(p)
-
-        #all_subsets.append(obstacle_pts)
-
-        if len(obstacle_triangle) != 0 and len(too_high) == 0:
-            projected_area_2d += area_2d(p1,p2,p3)
-            area_3d += area_polygon_3d([p1,p2,p3])
-            #print ("Triangle id ", k, "--- Number of point in = ", len(subset), " - Number of obstacle points = ", len(obstacle_pts))
-        k += 1
-    print("Projected roof area in 2D: ", projected_area_2d)
-    print("Roof area in 3D: ", area_3d)
+            for p in obstacle_triangle:
+                obstacle_pts.append(p)
 
 
-    # visualise all points detected as obstacles
-    for p in obstacle_pts:
-        #for obstacle_point in obstacle_arr:
-        point = tuple(p)
-        tuples.append(point)
-    a = np.array(tuples, dtype=[('x', 'f4'), ('y', 'f4'), ('z', 'f4')])
-    print("Number of obstacle points found: ", len(obstacle_pts))
+            if len(obstacle_triangle) != 0 and len(too_high) == 0:
+                projected_area_2d += area_2d(p1,p2,p3)
+                area_3d += area_polygon_3d([p1,p2,p3])
+                #print ("Triangle id ", k, "--- Number of point in = ", len(subset), " - Number of obstacle points = ", len(obstacle_pts))
+            k += 1
+        print("Projected roof area in 2D: ", projected_area_2d)
+        print("Roof area in 3D: ", area_3d)
 
-    # write PLY
-    el = PlyElement.describe(a, 'vertex')
+        # visualise all points detected as obstacles
+        write_ply(obstacle_pts, './fileout/points_test.ply')
 
-    with open('points_test.ply', mode='wb') as f:
-        PlyData([el], text=True).write(f)
+        # # Manual clustering
+        # kd = scipy.spatial.KDTree(obstacle_pts)
+        # tops_id = set()
+        # tops = []
+        # stack = deque()
+        # stacked_points_id = set()
 
+        # pid = 0
+        # for p in obstacle_pts:
+        #     stacked_points_id.add(pid)
+        #     stack.append(pid)
+        #     top = pid
+        #     while (len(stack) > 0):
+        #         assert(len(stack) == 1)
+        #         current_id = stack[-1]
+        #         stack.pop()
 
-    # Manual clustering
-    kd = scipy.spatial.KDTree(obstacle_pts)
-    tops_id = set()
-    tops = []
-    stack = deque()
-    stacked_points_id = set()
+        #         # We get the higher point in the radius search
+        #         higher_id = current_id
+        #         subset_id = kd.query_ball_point(obstacle_pts[current_id], r = 5)
+        #         #print(len(subset_id))
 
-    pid = 0
-    for p in obstacle_pts:
-        stacked_points_id.add(pid)
-        stack.append(pid)
-        top = pid
-        while (len(stack) > 0):
-            assert(len(stack) == 1)
-            current_id = stack[-1]
-            stack.pop()
+        #         for id in subset_id:
+        #             if obstacle_pts[id][2] > obstacle_pts[higher_id][2]:
+        #                 higher_id = id
+                
+        #         if higher_id not in stacked_points_id:
+        #             stack.append(higher_id)
+        #             stacked_points_id.add(higher_id)
+        #         else: 
+        #             top = higher_id
+        #     pid += 1
+        #     # We add the top to the top of the obstacles
+        #     if top not in tops_id:
+        #         tops_id.add(top)
+        #         tops.append(obstacle_pts[top])
+        #     else: continue
 
-            # We get the higher point in the radius search
-            higher_id = current_id
-            subset_id = kd.query_ball_point(obstacle_pts[current_id], r = 5)
-            #print(len(subset_id))
+        # print("Number of clusters: ", len(tops))
 
-            for id in subset_id:
-                if obstacle_pts[id][2] > obstacle_pts[higher_id][2]:
-                    higher_id = id
-            
-            if higher_id not in stacked_points_id:
-                stack.append(higher_id)
-                stacked_points_id.add(higher_id)
-            else: 
-                top = higher_id
-        pid += 1
-        # We add the top to the top of the obstacles
-        if top not in tops_id:
-            tops_id.add(top)
-            tops.append(obstacle_pts[top])
-        else: continue
+        # # KD tree for the tops
+        # kd_tops = scipy.spatial.KDTree(tops)
 
-    print("Number of clusters: ", len(tops))
+        # # search for each point its closest top-point
+        # dict_obstacles = {}
+        # for id in range(len(tops)):
+        #     dict_obstacles[str(id)] = list()
+        # id_ = 0
+        # for p in obstacle_pts:
+        #     # Nearest neighbour search
+        #     dist, id = kd_tops.query(p, k=1)
+        #     dict_obstacles[str(id)].append(id_)
+        #     id_ += 1
 
-    # KD tree for the tops
-    kd_tops = scipy.spatial.KDTree(tops)
-
-    # search for each point its closest top-point
-    dict_obstacles = {}
-    for id in range(len(tops)):
-        dict_obstacles[str(id)] = list()
-    id_ = 0
-    for p in obstacle_pts:
-        # Nearest neighbour search
-        dist, id = kd_tops.query(p, k=1)
-        dict_obstacles[str(id)].append(id_)
-        id_ += 1
-
-    # Check and visualise clusters
-    file = "out_test.txt"
-    with open(file, "w") as f:
-        f.write("x y z obstacle \n")
-        count = 0
-        for key in dict_obstacles:
-            for val in dict_obstacles[key]:
-                f.write(str(obstacle_pts[val][0]))
-                f.write(" ")
-                f.write(str(obstacle_pts[val][1]))
-                f.write(" ")
-                f.write(str(obstacle_pts[val][2]))
-                f.write(" ")
-                f. write(key)
-                f.write("\n")
-            count += 1
-        f.close()
+        # # Check and visualise clusters
+        # file = "./fileout/out_test.txt"
+        # with open(file, "w") as f:
+        #     f.write("x y z obstacle \n")
+        #     count = 0
+        #     for key in dict_obstacles:
+        #         for val in dict_obstacles[key]:
+        #             f.write(str(obstacle_pts[val][0]))
+        #             f.write(" ")
+        #             f.write(str(obstacle_pts[val][1]))
+        #             f.write(" ")
+        #             f.write(str(obstacle_pts[val][2]))
+        #             f.write(" ")
+        #             f. write(key)
+        #             f.write("\n")
+        #         count += 1
+        #     f.close()
 
 
-    # Obstacle points convex-hull
 
-    # Area calculation
 
-    # Solar potential area computation
 
-    # Store new attribute per building
+
+        # Obstacle points convex-hull
+
+        # Area calculation
+
+        # Solar potential area computation
+
+        # Store new attribute per building
 
     return
 
