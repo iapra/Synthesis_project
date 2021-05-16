@@ -276,7 +276,17 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     # Check and visualise clusters
     write_txt_cluster(dict_obstacles, obstacle_pts, "./fileout/out_test.txt")
 
+    # Create np-array of each cluster
+    clusters_arr = []
+    for key in dict_obstacles:
+        array_point3d = []
+        for val in dict_obstacles[key]:
+            array_point3d.append(obstacle_pts[val])
+        clusters_arr.append(array_point3d)
+    #print(clusters_arr)
+
     # Obstacle points convex-hull
+    #hull = scipy.spatial.Delaunay([:,:2])
 
     # Area calculation
 
