@@ -97,6 +97,9 @@ def shortest_distance(p, equation_coef):
     #print(numerator/denum)
     return numerator/denum
 
+def distance_2p(p1,p2):
+    math.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2 + (p2[2] - p1[1])**2)
+
 def get_height_difference(vertices):
     z= []
     for vertex in vertices:
@@ -178,7 +181,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     k = 0
     obstacle_pts = []
     subset_all = []
-    nodup_obs_pts = []
+    #nodup_obs_pts = []
 
     projected_area_2d = 0.00
     area_3d = 0.00
@@ -263,7 +266,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
 
             # We get the higher point in the radius search
             higher_id = current_id
-            subset_id = kd.query_ball_point(obstacle_pts[current_id], r = 7)
+            subset_id = kd.query_ball_point(obstacle_pts[current_id], r = 5)
             #print(len(subset_id))
 
             for id in subset_id:
@@ -295,6 +298,10 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     for p in obstacle_pts:
         # Nearest neighbour search
         dist, id = kd_tops.query(p, k=1)
+        # if dist < 3:
+        #     dict_obstacles[str(id)].append(id_)
+        # else: 
+        #     continue
         dict_obstacles[str(id)].append(id_)
         id_ += 1
 
