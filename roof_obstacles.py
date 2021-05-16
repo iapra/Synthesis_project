@@ -6,7 +6,7 @@ import pandas as pd
 from numpy.lib.function_base import corrcoef
 import scipy.spatial
 from plyfile import PlyData, PlyElement
-from collections import deque
+from collections import UserString, deque
 
 #-- to speed up the nearest neighbour us a kd-tree
 # https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html#scipy.spatial.KDTree
@@ -187,14 +187,13 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     write_obj(vertices, faces, './fileout/roofs_out.obj')
 
     # OBSTACLE EXTRACTION
+    set_point = set()
     for building in faces:
         obstacle_building = []
         #height_building = get_height_difference(faces)
         #print("Building's height is ", height_building)
         for triangle in building:
             subset = []
-            # already_in = set([])
-
             assert (len(triangle) == 3)
             p1 = vertices[triangle[0]]
             p2 = vertices[triangle[1]]
@@ -202,17 +201,19 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
             projected_area_2d += area_2d(p1,p2,p3)
             area_3d += area_polygon_3d([p1,p2,p3])
 
+            id_point = 0
             for point in point_cloud:
-                if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point):
+                if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point) and id_point not in set_point:
+                # if isInside(p1, p2, p3, point) and id_point not in set_point: 
+                    set_point.add(id_point)
                     subset.append(point)
                     subset_all.append(point)
-                    # already_in.add(point)
+                id_point += 1
                 
             # Triangle is vertical?
             if len(subset) == 0: 
-                #print("zero !")
                 continue
-            
+        
             # Distance points to surface: discard points closer than threshold to define
             else:
                 threshold = 0.4
@@ -231,32 +232,27 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     #write_ply(obstacle_pts, './fileout/points_obtacle.ply')
 
 
-    # Remove duplicates in obstacle_pts
-    no_duplicate_obs = set()
-    for pt in obstacle_pts:
-        no_duplicate_obs.add(tuple(pt))
+    # # Remove duplicates in obstacle_pts
+    # no_duplicate_obs = set()
+    # for pt in obstacle_pts:
+    #     no_duplicate_obs.add(tuple(pt))
 
-    for each in no_duplicate_obs:
-        nodup_obs_pts.append(list(each))
-
-    # print(nodup_obs_pts)
-    # print(len(nodup_obs_pts))
-    # print(len(no_duplicate_obs))
+    # for each in no_duplicate_obs:
+    #     nodup_obs_pts.append(list(each))
 
     # visualise all points detected as obstacles
     # write_ply(obstacle_pts, './fileout/points_obtacle.ply')
     # write_ply(no_duplicate_obs, './fileout/points_obtacle.ply')
 
-
     # Manual clustering
-    kd = scipy.spatial.KDTree(nodup_obs_pts)
+    kd = scipy.spatial.KDTree(obstacle_pts)
     tops_id = set()
     tops = []
     stack = deque()
     stacked_points_id = set()
 
     pid = 0
-    for p in nodup_obs_pts:
+    for p in obstacle_pts:
         stacked_points_id.add(pid)
         stack.append(pid)
         top = pid
@@ -267,11 +263,11 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
 
             # We get the higher point in the radius search
             higher_id = current_id
-            subset_id = kd.query_ball_point(nodup_obs_pts[current_id], r = 5)
+            subset_id = kd.query_ball_point(obstacle_pts[current_id], r = 7)
             #print(len(subset_id))
 
             for id in subset_id:
-                if nodup_obs_pts[id][2] > nodup_obs_pts[higher_id][2]:
+                if obstacle_pts[id][2] > obstacle_pts[higher_id][2]:
                     higher_id = id
             
             if higher_id not in stacked_points_id:
@@ -283,7 +279,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
         # We add the top to the top of the obstacles
         if top not in tops_id:
             tops_id.add(top)
-            tops.append(nodup_obs_pts[top])
+            tops.append(obstacle_pts[top])
         else: continue
 
     print("Number of clusters: ", len(tops))
@@ -296,18 +292,85 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     for id in range(len(tops)):
         dict_obstacles[str(id)] = list()
     id_ = 0
-    for p in nodup_obs_pts:
+    for p in obstacle_pts:
         # Nearest neighbour search
         dist, id = kd_tops.query(p, k=1)
         dict_obstacles[str(id)].append(id_)
         id_ += 1
 
     # Check and visualise clusters
-    write_txt_cluster(dict_obstacles, nodup_obs_pts, "./fileout/out_test.txt")
+    write_txt_cluster(dict_obstacles, obstacle_pts, "./fileout/out_test.txt")
+
+    # Create np-array of each cluster
+    clusters_arr = []
+    for key in dict_obstacles:
+        array_point3d = []
+        for val in dict_obstacles[key]:
+            point_arr = [obstacle_pts[val][0], obstacle_pts[val][1], obstacle_pts[val][2]]
+            array_point3d.append(point_arr)
+        if len(array_point3d) > 3:                  # add condition of number of points in the cluster
+            clusters_arr.append(array_point3d)
+    #print(clusters_arr)
 
     # Obstacle points convex-hull
+    
+    hulls = []
+    for cluster_ in clusters_arr:
+        #print(cluster_)
+        cluster = np.array(cluster_)
+        try:
+            hull = scipy.spatial.ConvexHull(cluster[:,:2])
+            hull_arr = []
+            for vertex_id in hull.vertices:
+                hull_arr.append(cluster[vertex_id])
+            hulls.append(hull_arr)
+        except:
+            continue
+            #print ("Didnt work :(")
 
-    # Area calculation
+   # print(hulls)
+
+    # Check for one hull
+    hull_vertices = []
+    hull_faces = []
+    id_p = 0
+    for hull in hulls:
+        face_ = []
+        for vertex in hull:
+            v = [vertex[0], vertex[1],10]
+            hull_vertices.append(v)
+            face_.append(id_p)
+            id_p += 1
+        hull_faces.append(face_)
+    #print(hull_faces)
+
+    # write file
+    with open("./fileout/hulls.obj", "w") as file:
+        for v in hull_vertices:
+            file.write("v ")
+            file.write(str(v[0]))
+            file.write(" ")
+            file.write(str(v[1]))
+            file.write(" ")
+            file.write(str(v[2]))
+            file.write("\n")
+        file.write("Oo\n")
+        for f in hull_faces:
+            i = 0
+            file.write("f ")
+            while i < len(f):
+                file.write(str(f[i]+1))
+                file.write(" ")
+                i += 1
+            file.write("\n")
+        file.close()
+
+
+    # Area calculation of hulls
+    for hull in hulls:
+        a = area_polygon_3d(hull)
+        #print (a)
+
 
     # Solar potential area computation
 
