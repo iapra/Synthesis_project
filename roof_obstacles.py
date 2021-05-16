@@ -7,6 +7,12 @@ from numpy.lib.function_base import corrcoef
 import scipy.spatial
 from plyfile import PlyData, PlyElement
 from collections import UserString, deque
+from numpy import unique
+from numpy import where
+from sklearn.datasets import make_classification
+from sklearn.cluster import Birch
+from sklearn.datasets import make_blobs
+from matplotlib import pyplot
 
 #-- to speed up the nearest neighbour us a kd-tree
 # https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html#scipy.spatial.KDTree
@@ -307,6 +313,34 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
 
     # Check and visualise clusters
     write_txt_cluster(dict_obstacles, obstacle_pts, "./fileout/out_test.txt")
+
+    #Birch clustering
+
+    # define dataset
+    nb_cluster = round(len(obstacle_pts)/5)
+    X, _ = make_classification(n_samples=len(obstacle_pts),
+            n_features=nb_cluster, n_informative=nb_cluster,
+            n_redundant=0, n_clusters_per_class=1)
+    #make blobs - let's try another way
+    # dataset = make_blobs(n_samples=len(obstacle_pts), n_features=nb_cluster, centers=nb_cluster, cluster_std=1.6, random_state=50)
+
+    # define the model
+    model = Birch(threshold=0.01, n_clusters=nb_cluster)
+    # fit the model
+    model.fit(X)
+    # assign a cluster to each example
+    yhat = model.predict(X)
+    # retrieve unique clusters
+    clusters = unique(yhat)
+    # create scatter plot for samples from each cluster
+    for cluster in clusters:
+        # get row indexes for samples with this cluster
+        row_ix = where(yhat == cluster)
+        # create scatter of these samples
+        pyplot.scatter(X[:,0], X[:,1], c=yhat)
+    # show the plot
+    pyplot.show()
+
 
     # Create np-array of each cluster
     clusters_arr = []
