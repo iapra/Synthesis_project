@@ -6,7 +6,7 @@ import pandas as pd
 from numpy.lib.function_base import corrcoef
 import scipy.spatial
 from plyfile import PlyData, PlyElement
-from collections import deque
+from collections import UserString, deque
 
 #-- to speed up the nearest neighbour us a kd-tree
 # https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html#scipy.spatial.KDTree
@@ -174,14 +174,13 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     write_obj(vertices, faces, './fileout/roofs_out.obj')
 
     # OBSTACLE EXTRACTION
-    for building in faces:
+    set_point = set()
+    for building in faces[0:2]:
         obstacle_building = []
         #height_building = get_height_difference(faces)
         #print("Building's height is ", height_building)
         for triangle in building:
             subset = []
-            # already_in = set([])
-
             assert (len(triangle) == 3)
             p1 = vertices[triangle[0]]
             p2 = vertices[triangle[1]]
@@ -189,18 +188,19 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
             projected_area_2d += area_2d(p1,p2,p3)
             area_3d += area_polygon_3d([p1,p2,p3])
 
+            id_point = 0
             for point in point_cloud:
-                if isInside(p1, p2, p3, point): 
+                if isInside(p1, p2, p3, point) and id_point not in set_point: 
                     # TODO add a condition that the point should not be under the plane
+                    set_point.add(id_point)
                     subset.append(point)
                     subset_all.append(point)
-                    # already_in.add(point)
+                id_point += 1
                 
             # Triangle is vertical?
             if len(subset) == 0: 
-                #print("zero !")
                 continue
-            
+        
             # Distance points to surface: discard points closer than threshold to define
             else:
                 threshold = 0.4
@@ -281,14 +281,33 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     for key in dict_obstacles:
         array_point3d = []
         for val in dict_obstacles[key]:
-            array_point3d.append(obstacle_pts[val])
-        clusters_arr.append(array_point3d)
+            point_arr = [obstacle_pts[val][0], obstacle_pts[val][1], obstacle_pts[val][2]]
+            array_point3d.append(point_arr)
+        if len(array_point3d) > 4:                  # add condition of number of points in the cluster
+            clusters_arr.append(array_point3d)
     #print(clusters_arr)
 
     # Obstacle points convex-hull
-    #hull = scipy.spatial.Delaunay([:,:2])
+    
+    hulls = []
+    for cluster_ in clusters_arr:
+        #print(cluster_)
+        cluster = np.array(cluster_)
+        hull = scipy.spatial.ConvexHull(cluster[:,:2])
+
+        hull_arr = []
+        for vertex_id in hull.vertices:
+            hull_arr.append(cluster[vertex_id])
+        hulls.append(hull_arr)
+    
+    print(hulls)
+
+    # Check for one hull
+    for hull in hulls:
+        write_ply(hull, "./fileout/hull.ply")
 
     # Area calculation
+    
 
     # Solar potential area computation
 
