@@ -175,7 +175,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
 
     # OBSTACLE EXTRACTION
     set_point = set()
-    for building in faces[0:2]:
+    for building in faces:
         obstacle_building = []
         #height_building = get_height_difference(faces)
         #print("Building's height is ", height_building)
@@ -283,7 +283,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
         for val in dict_obstacles[key]:
             point_arr = [obstacle_pts[val][0], obstacle_pts[val][1], obstacle_pts[val][2]]
             array_point3d.append(point_arr)
-        if len(array_point3d) > 4:                  # add condition of number of points in the cluster
+        if len(array_point3d) > 3:                  # add condition of number of points in the cluster
             clusters_arr.append(array_point3d)
     #print(clusters_arr)
 
@@ -293,21 +293,59 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     for cluster_ in clusters_arr:
         #print(cluster_)
         cluster = np.array(cluster_)
-        hull = scipy.spatial.ConvexHull(cluster[:,:2])
+        try:
+            hull = scipy.spatial.ConvexHull(cluster[:,:2])
+            hull_arr = []
+            for vertex_id in hull.vertices:
+                hull_arr.append(cluster[vertex_id])
+            hulls.append(hull_arr)
+        except:
+            continue
+            #print ("Didnt work :(")
 
-        hull_arr = []
-        for vertex_id in hull.vertices:
-            hull_arr.append(cluster[vertex_id])
-        hulls.append(hull_arr)
-    
-    print(hulls)
+   # print(hulls)
 
     # Check for one hull
+    hull_vertices = []
+    hull_faces = []
+    id_p = 0
     for hull in hulls:
-        write_ply(hull, "./fileout/hull.ply")
+        face_ = []
+        for vertex in hull:
+            v = [vertex[0], vertex[1],6]
+            hull_vertices.append(v)
+            face_.append(id_p)
+            id_p += 1
+        hull_faces.append(face_)
+    #print(hull_faces)
 
-    # Area calculation
-    
+    # write file
+    with open("./fileout/hulls.obj", "w") as file:
+        for v in hull_vertices:
+            file.write("v ")
+            file.write(str(v[0]))
+            file.write(" ")
+            file.write(str(v[1]))
+            file.write(" ")
+            file.write(str(v[2]))
+            file.write("\n")
+        file.write("Oo\n")
+        for f in hull_faces:
+            i = 0
+            file.write("f ")
+            while i < len(f):
+                file.write(str(f[i]+1))
+                file.write(" ")
+                i += 1
+            file.write("\n")
+        file.close()
+
+
+    # Area calculation of hulls
+    for hull in hulls:
+        a = area_polygon_3d(hull)
+        #print (a)
+
 
     # Solar potential area computation
 
