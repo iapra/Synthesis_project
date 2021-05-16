@@ -178,6 +178,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     k = 0
     obstacle_pts = []
     subset_all = []
+    nodup_obs_pts = []
 
     projected_area_2d = 0.00
     area_3d = 0.00
@@ -235,7 +236,12 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     for pt in obstacle_pts:
         no_duplicate_obs.add(tuple(pt))
 
-    print(len(no_duplicate_obs))
+    for each in no_duplicate_obs:
+        nodup_obs_pts.append(list(each))
+
+    # print(nodup_obs_pts)
+    # print(len(nodup_obs_pts))
+    # print(len(no_duplicate_obs))
 
     # visualise all points detected as obstacles
     # write_ply(obstacle_pts, './fileout/points_obtacle.ply')
@@ -243,14 +249,14 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
 
 
     # Manual clustering
-    kd = scipy.spatial.KDTree(obstacle_pts)
+    kd = scipy.spatial.KDTree(nodup_obs_pts)
     tops_id = set()
     tops = []
     stack = deque()
     stacked_points_id = set()
 
     pid = 0
-    for p in obstacle_pts:
+    for p in nodup_obs_pts:
         stacked_points_id.add(pid)
         stack.append(pid)
         top = pid
@@ -261,11 +267,11 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
 
             # We get the higher point in the radius search
             higher_id = current_id
-            subset_id = kd.query_ball_point(obstacle_pts[current_id], r = 5)
+            subset_id = kd.query_ball_point(nodup_obs_pts[current_id], r = 5)
             #print(len(subset_id))
 
             for id in subset_id:
-                if obstacle_pts[id][2] > obstacle_pts[higher_id][2]:
+                if nodup_obs_pts[id][2] > nodup_obs_pts[higher_id][2]:
                     higher_id = id
             
             if higher_id not in stacked_points_id:
@@ -277,7 +283,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
         # We add the top to the top of the obstacles
         if top not in tops_id:
             tops_id.add(top)
-            tops.append(obstacle_pts[top])
+            tops.append(nodup_obs_pts[top])
         else: continue
 
     print("Number of clusters: ", len(tops))
@@ -290,14 +296,14 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
     for id in range(len(tops)):
         dict_obstacles[str(id)] = list()
     id_ = 0
-    for p in obstacle_pts:
+    for p in nodup_obs_pts:
         # Nearest neighbour search
         dist, id = kd_tops.query(p, k=1)
         dict_obstacles[str(id)].append(id_)
         id_ += 1
 
     # Check and visualise clusters
-    write_txt_cluster(dict_obstacles, obstacle_pts, "./fileout/out_test.txt")
+    write_txt_cluster(dict_obstacles, nodup_obs_pts, "./fileout/out_test.txt")
 
     # Obstacle points convex-hull
 
