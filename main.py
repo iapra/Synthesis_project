@@ -94,7 +94,7 @@ def main():
 
     # -- detect obstacles
     #roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file)
-    roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file)
+    roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
 
 
 if __name__ == '__main__':
