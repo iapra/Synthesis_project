@@ -24,12 +24,24 @@ def isInside(p1,p2,p3, p):
     #if A <= 0.02: return False
     tolerance = 0.1
     A1 = area_2d (p, p2, p3)
-    A2 = area_2d (p1, p, p3)   
+    A2 = area_2d (p1, p, p3)
     A3 = area_2d (p1, p2, p)
     if((A >= (A1 + A2 + A3) - tolerance) and (A <= (A1 + A2 + A3) + tolerance)) or ((A1 + A2 + A3) >= (A - tolerance) and (A1 + A2 + A3) <= (A + tolerance)):
         return True
     else:
         return False
+
+
+def isAbove(p1, p2, p3, p):
+    det_above = np.linalg.det([[p1[0], p1[1], p1[2], 1],
+                               [p2[0], p2[1], p2[2], 1],
+                               [p3[0], p3[1], p3[2], 1],
+                               [p[0], p[1], p[2], 1]])
+    if det_above < 0:
+        return True
+    else:
+        return False
+
 
 #unit normal vector of plane defined by points a, b, and c
 def unit_normal(a, b, c):
@@ -190,8 +202,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
             area_3d += area_polygon_3d([p1,p2,p3])
 
             for point in point_cloud:
-                if isInside(p1, p2, p3, point): 
-                    # TODO add a condition that the point should not be under the plane
+                if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point):
                     subset.append(point)
                     subset_all.append(point)
                     # already_in.add(point)
@@ -210,7 +221,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
                     if dist > threshold: 
                         obstacle_building.append(p)
                         obstacle_pts.append(p)
-                        # TODO check that there are no duplicated points in obstacle_pts
                     else: continue
             k += 1
         print("Projected roof area in 2D: ", projected_area_2d)
@@ -218,6 +228,19 @@ def detect_obstacles(point_cloud, vertices, faces, output_file):
 
     # visualise all points detected as obstacles
     #write_ply(obstacle_pts, './fileout/points_obtacle.ply')
+
+
+    # Remove duplicates in obstacle_pts
+    no_duplicate_obs = set()
+    for pt in obstacle_pts:
+        no_duplicate_obs.add(tuple(pt))
+
+    print(len(no_duplicate_obs))
+
+    # visualise all points detected as obstacles
+    # write_ply(obstacle_pts, './fileout/points_obtacle.ply')
+    # write_ply(no_duplicate_obs, './fileout/points_obtacle.ply')
+
 
     # Manual clustering
     kd = scipy.spatial.KDTree(obstacle_pts)
