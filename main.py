@@ -9,11 +9,11 @@ import json
 # -- *all* code goes into 'roof_obstacles'
 import roof_obstacles
 
-input_ply = "./data/extract.ply"
+input_ply = "./data/extract1.ply"
 #input_ply = "./data/one_building.ply"
 input_obj = "./data/3d_one_building.obj"
 output_file = "./data/out.json"
-input_json = "./data/extract.json"
+input_json = "./data/extract1.json"
 
 # Structures to get the input elements:
 vertices = []

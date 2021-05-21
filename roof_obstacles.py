@@ -34,8 +34,7 @@ def write_json(in_file, outfile, dict):
     except (IOError):
         print ("Could not copy file.")
         sys.exit(3)
-    
-    print(dict)
+    #print(dict)
 
     # We edit the copy by adding an attribute
     with open(outfile, 'r+') as f:
@@ -212,18 +211,13 @@ def write_txt_cluster(dict_obstacles, obstacle_pts, fileout):
 
 def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     print("Number of vertices: ", len(vertices))
-    print("Number of faces: ", len(faces))
+    print("Number of buildings: ", len(faces))
 
-    # ALL FOLLOWING SHOULD BE FOR 1 BUILDING // TO ADAPT
-    # Loop through triangles and select points above it (in a local subset)
-    k = 0
-    #obstacle_pts = []
-    #nodup_obs_pts = []
-
-
-    projected_area_2d = 0.00
-    area_3d = 0.00
     dict_buildings = {}
+    dict_obstacles_total = {}
+    tops_total = []
+    obstacle_pts_total = []
+    hulls = []
 
     # ROOF EXPORT IN OBJ FOR VISUALISATION: Check that faces are only roofs and LOD2
     write_obj(vertices, faces, './fileout/roofs_out.obj')
@@ -232,10 +226,9 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     set_point = set()
     building_nb = 1
     for building in faces:
+        projected_area_2d = 0.00
+        area_3d = 0.00
         obstacle_pts = []
-        obstacle_building = []
-        #height_building = get_height_difference(faces)
-        #print("Building's height is ", height_building)
         for triangle in building:
             subset = []
             assert (len(triangle) == 3)
@@ -261,28 +254,10 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                 threshold = 0.4
                 for p in subset:
                     dist = shortest_distance(p, plane_equation(p1,p2,p3))
-                    #print(dist)
                     if dist > threshold: 
-                        obstacle_building.append(p)
                         obstacle_pts.append(p)
+                        obstacle_pts_total.append(p)
                     else: continue
-            k += 1
-
-        # visualise all points detected as obstacles
-        #write_ply(obstacle_pts, './fileout/points_obtacle.ply')
-
-
-        # # Remove duplicates in obstacle_pts
-        # no_duplicate_obs = set()
-        # for pt in obstacle_pts:
-        #     no_duplicate_obs.add(tuple(pt))
-
-        # for each in no_duplicate_obs:
-        #     nodup_obs_pts.append(list(each))
-
-        # visualise all points detected as obstacles
-        # write_ply(obstacle_pts, './fileout/points_obtacle.ply')
-        # write_ply(no_duplicate_obs, './fileout/points_obtacle.ply')
 
         # Manual clustering
         kd = scipy.spatial.KDTree(obstacle_pts)
@@ -303,8 +278,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
                 # We get the higher point in the radius search
                 higher_id = current_id
-                subset_id = kd.query_ball_point(obstacle_pts[current_id], r = 5)
-                #print(len(subset_id))
+                subset_id = kd.query_ball_point(obstacle_pts[current_id], r = 4)
 
                 for id in subset_id:
                     if obstacle_pts[id][2] > obstacle_pts[higher_id][2]:
@@ -320,6 +294,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             if top not in tops_id:
                 tops_id.add(top)
                 tops.append(obstacle_pts[top])
+                tops_total.append(obstacle_pts[top])
             else: continue
 
         print("Number of clusters for building ",building_nb, ": ", len(tops))
@@ -331,6 +306,8 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         dict_obstacles = {}
         for id in range(len(tops)):
             dict_obstacles[str(id)] = list()
+            id_total = int(id + len(dict_obstacles_total))
+            dict_obstacles_total[str(id_total)] = list()
         id_ = 0
         for p in obstacle_pts:
             # Nearest neighbour search
@@ -342,35 +319,36 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             dict_obstacles[str(id)].append(id_)
             id_ += 1
 
+
         # Check and visualise clusters
-        write_txt_cluster(dict_obstacles, obstacle_pts, "./fileout/out_test.txt")
+        #write_txt_cluster(dict_obstacles, obstacle_pts, "./fileout/cluster.txt")
 
-        #Birch clustering
+        # #Birch clustering
 
-        # define dataset
-        nb_cluster = round(len(obstacle_pts)/5)
-        X, _ = make_classification(n_samples=len(obstacle_pts),
-                n_features=nb_cluster, n_informative=nb_cluster,
-                n_redundant=0, n_clusters_per_class=1)
-        #make blobs - let's try another way
-        # dataset = make_blobs(n_samples=len(obstacle_pts), n_features=nb_cluster, centers=nb_cluster, cluster_std=1.6, random_state=50)
+        # # define dataset
+        # nb_cluster = round(len(obstacle_pts)/5)
+        # X, _ = make_classification(n_samples=len(obstacle_pts),
+        #         n_features=nb_cluster, n_informative=nb_cluster,
+        #         n_redundant=0, n_clusters_per_class=1)
+        # #make blobs - let's try another way
+        # # dataset = make_blobs(n_samples=len(obstacle_pts), n_features=nb_cluster, centers=nb_cluster, cluster_std=1.6, random_state=50)
 
-        # define the model
-        model = Birch(threshold=0.01, n_clusters=nb_cluster)
-        # fit the model
-        model.fit(X)
-        # assign a cluster to each example
-        yhat = model.predict(X)
-        # retrieve unique clusters
-        clusters = unique(yhat)
-        # create scatter plot for samples from each cluster
-        for cluster in clusters:
-            # get row indexes for samples with this cluster
-            row_ix = where(yhat == cluster)
-            # create scatter of these samples
-            pyplot.scatter(X[:,0], X[:,1], c=yhat)
-        # show the plot
-        #pyplot.show()
+        # # define the model
+        # model = Birch(threshold=0.01, n_clusters=nb_cluster)
+        # # fit the model
+        # model.fit(X)
+        # # assign a cluster to each example
+        # yhat = model.predict(X)
+        # # retrieve unique clusters
+        # clusters = unique(yhat)
+        # # create scatter plot for samples from each cluster
+        # for cluster in clusters:
+        #     # get row indexes for samples with this cluster
+        #     row_ix = where(yhat == cluster)
+        #     # create scatter of these samples
+        #     pyplot.scatter(X[:,0], X[:,1], c=yhat)
+        # # show the plot
+        # #pyplot.show()
 
         # Create np-array of each cluster
         clusters_arr = []
@@ -381,12 +359,9 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                 array_point3d.append(point_arr)
             if len(array_point3d) > 3:                  # add condition of number of points in the cluster
                 clusters_arr.append(array_point3d)
-        #print(clusters_arr)
 
         # Obstacle points convex-hull
-        hulls = []
         for cluster_ in clusters_arr:
-            #print(cluster_)
             cluster = np.array(cluster_)
             try:
                 hull = scipy.spatial.ConvexHull(cluster[:,:2])
@@ -397,48 +372,11 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             except:
                 continue
 
-        # Check for one hull
-        hull_vertices = []
-        hull_faces = []
-        id_p = 0
-        for hull in hulls:
-            face_ = []
-            for vertex in hull:
-                v = [vertex[0], vertex[1],10]
-                hull_vertices.append(v)
-                face_.append(id_p)
-                id_p += 1
-            hull_faces.append(face_)
-        #print(hull_faces)
-
-        # write file
-        with open("./fileout/hulls.obj", "w") as file:
-            for v in hull_vertices:
-                file.write("v ")
-                file.write(str(v[0]))
-                file.write(" ")
-                file.write(str(v[1]))
-                file.write(" ")
-                file.write(str(v[2]))
-                file.write("\n")
-            file.write("Oo\n")
-            for f in hull_faces:
-                i = 0
-                file.write("f ")
-                while i < len(f):
-                    file.write(str(f[i]+1))
-                    file.write(" ")
-                    i += 1
-                file.write("\n")
-            file.close()
-
-
         # Area calculation of hulls
         obstacle_area = 0
         for hull in hulls:
             a = area_polygon_3d(hull)
             obstacle_area += a
-        #print (obstacle_area)
 
         # Solar potential area computation
         # For now we do an ugly cross proportional cross product! (TODO - project conv-hull on 3d surfaces)
@@ -453,8 +391,60 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         # print("Projected roof area in 2D: ", projected_area_2d)
         # print("Roof area in 3D: ", area_3d)
 
+
+    # Visualise clusters of obstacle points -> txt file
+    # KD tree for the tops
+    kd_tops_total = scipy.spatial.KDTree(tops_total)
+
+    # search for each point its closest top-point
+    dict_obstacles_total = {}
+    for id in range(len(tops_total)):
+        dict_obstacles_total[str(id)] = list()
+
+    id_ = 0
+    for p in obstacle_pts_total:
+        dist, id = kd_tops_total.query(p, k=1)
+        dict_obstacles_total[str(id)].append(id_)
+        id_ += 1
+
+    # Visualise convex-hulls -> to obj file
+    hulls_vertices = []
+    hulls_faces = []
+    id_p = 0
+    for hull in hulls:
+        face_ = []
+        for vertex in hull:
+            v = [vertex[0], vertex[1],10]
+            hulls_vertices.append(v)
+            face_.append(id_p)
+            id_p += 1
+        hulls_faces.append(face_)
+
+    # write file (hulls obj)
+    with open("./fileout/hulls.obj", "w") as file:
+        for v in hulls_vertices:
+            file.write("v ")
+            file.write(str(v[0]))
+            file.write(" ")
+            file.write(str(v[1]))
+            file.write(" ")
+            file.write(str(v[2]))
+            file.write("\n")
+        file.write("Oo\n")
+        for f in hulls_faces:
+            i = 0
+            file.write("f ")
+            while i < len(f):
+                file.write(str(f[i]+1))
+                file.write(" ")
+                i += 1
+            file.write("\n")
+        file.close()
+
     # Store new attribute per building
-    write_json(input_json, "./fileout/extract_out.json", dict_buildings)
+    write_txt_cluster(dict_obstacles_total, obstacle_pts_total, "./fileout/clusters.txt")
+    write_ply(obstacle_pts_total, './fileout/points_obtacle.ply')
+    #write_json(input_json, "./fileout/extract_out.json", dict_buildings)
     #print (dict_buildings)
 
     return
