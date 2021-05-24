@@ -8,8 +8,7 @@ from numpy.lib.function_base import corrcoef
 import scipy.spatial
 from plyfile import PlyData, PlyElement
 from collections import UserString, deque
-from numpy import unique
-from numpy import where
+from numpy import unique, where
 from sklearn.datasets import make_classification
 from sklearn.cluster import Birch
 from sklearn.datasets import make_blobs
@@ -51,7 +50,12 @@ def write_json(in_file, outfile, dict):
                 print(attribute_field) # key = attribute name
                 print (data["CityObjects"][i]["attributes"][attribute_field]) # attribute value
     f.close()
-            
+
+def get_buildingID (json_in, index):
+    with open(json_in, 'r') as f:
+        data = json.load(f)
+        building_id = list(data["CityObjects"].keys())[index]
+        return(building_id)
 
 def area_2d(p1,p2,p3):
     return abs((p1[0] * (p2[1] - p3[1]) + p2[0] * (p3[1] - p1[1])
@@ -222,7 +226,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     hulls = []
     features = []
 
-
     # ROOF EXPORT IN OBJ FOR VISUALISATION: Check that faces are only roofs and LOD2
     write_obj(vertices, faces, './fileout/roofs_out.obj')
 
@@ -233,6 +236,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     area_3d = 0.00
     for building in faces:
         obstacle_pts = []
+        rel_height = 0
         for triangle in building:
             subset = []
             assert (len(triangle) == 3)
@@ -261,9 +265,10 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                     if dist > threshold: 
                         obstacle_pts.append(p)
                         obstacle_pts_total.append(p)
+                        rel_height += dist
                     else: continue
-
-
+        rel_height /= len(obstacle_pts)
+        
         # Clean obstacle points
         obstacle_pts_final = []
         kd_first = scipy.spatial.KDTree(obstacle_pts)
@@ -401,11 +406,10 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         #print("In percentage, this is ", new_attribute_percent, " % ", "of the roof surface")
 
         dict_buildings[str(building_nb)] = new_attribute_percent /100
-        building_nb += 1
         # print("Projected roof area in 2D: ", projected_area_2d)
         # print("Roof area in 3D: ", area_3d)
 
-            # Write files to geoJSON
+        # Write files to geoJSON
         for hull in hulls:
             height_avg = 0
             polygon = []
@@ -417,8 +421,13 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             polygon.append (v_last)
             height_avg / len(hull)
             p = Polygon([polygon])
-            features.append(Feature(geometry = p, properties={"Height": str(height_avg), "Building": str(building_nb)}))
+            building_id = get_buildingID(input_json, building_nb-1)
+            features.append(Feature(geometry = p, properties={"Building": str(building_id),
+                                                            "Absolute height": str(height_avg), 
+                                                            "Relative height": str(rel_height), 
+                                                            }))
 
+        building_nb += 1
 
     # Visualise clusters of obstacle points -> txt file
     # KD tree for the tops
