@@ -216,6 +216,8 @@ def write_txt_cluster(dict_obstacles, obstacle_pts, fileout):
         f.close()
 
 def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
+    extract_nb = 6  # variable to name properly the output files
+
     print("Number of vertices: ", len(vertices))
     print("Number of buildings: ", len(faces))
 
@@ -267,7 +269,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                         obstacle_pts_total.append(p)
                         rel_height += dist
                     else: continue
-        rel_height /= len(obstacle_pts)
         
         # Clean obstacle points
         obstacle_pts_final = []
@@ -281,6 +282,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         #print(len(obstacle_pts))
         #print(len(obstacle_pts_final))
         if len(obstacle_pts_final) < 2: continue
+        rel_height /= len(obstacle_pts)
 
         # Manual clustering
         kd = scipy.spatial.KDTree(obstacle_pts_final)
@@ -320,7 +322,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                 tops_total.append(obstacle_pts_final[top])
             else: continue
 
-        print("Number of clusters for building ",building_nb, ": ", len(tops))
+        print("Number of obstacle detected for building ",building_nb, ": ", len(tops))
 
         # KD tree for the tops
         kd_tops = scipy.spatial.KDTree(tops)
@@ -422,7 +424,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             height_avg / len(hull)
             p = Polygon([polygon])
             building_id = get_buildingID(input_json, building_nb-1)
-            features.append(Feature(geometry = p, properties={"Building": str(building_id),
+            features.append(Feature(geometry = p, properties={"CityObject": str(building_id),
                                                             "Absolute height": str(height_avg), 
                                                             "Relative height": str(rel_height), 
                                                             }))
@@ -460,7 +462,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     #     features.append(Feature(geometry = p, properties={"Height": str(height_avg)}))
 
     feature_collection = FeatureCollection(features)
-    with open('./fileout/output.geojson', 'w') as geojson:
+    with open(str('./fileout/output_extract' + str(extract_nb) + '.geojson'), 'w') as geojson:
         dump(feature_collection, geojson)
 
     # # Visualise convex-hulls -> to obj file
