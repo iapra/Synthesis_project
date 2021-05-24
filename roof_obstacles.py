@@ -13,6 +13,7 @@ from sklearn.datasets import make_classification
 from sklearn.cluster import Birch
 from sklearn.datasets import make_blobs
 from matplotlib import pyplot
+from geojson import Point, Polygon, Feature, FeatureCollection, dump
 import json
 import os
 import sys
@@ -417,39 +418,59 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         dict_obstacles_total[str(id)].append(id_)
         id_ += 1
 
-    # Visualise convex-hulls -> to obj file
-    hulls_vertices = []
-    hulls_faces = []
-    id_p = 0
+    # Write files to geoJSON
+    features = []
     for hull in hulls:
-        face_ = []
+        height_avg = 0
         for vertex in hull:
-            v = [vertex[0], vertex[1],10]
-            hulls_vertices.append(v)
-            face_.append(id_p)
-            id_p += 1
-        hulls_faces.append(face_)
+            height_avg += vertex[2]
+        height_avg / len(hull)
 
-    # write file (hulls obj)
-    with open("./fileout/hulls.obj", "w") as file:
-        for v in hulls_vertices:
-            file.write("v ")
-            file.write(str(v[0]))
-            file.write(" ")
-            file.write(str(v[1]))
-            file.write(" ")
-            file.write(str(v[2]))
-            file.write("\n")
-        file.write("Oo\n")
-        for f in hulls_faces:
-            i = 0
-            file.write("f ")
-            while i < len(f):
-                file.write(str(f[i]+1))
-                file.write(" ")
-                i += 1
-            file.write("\n")
-        file.close()
+        polygon = []
+        for vertex in hull:
+            v = Point([vertex[0], vertex[1], height_avg])
+            #features.append(Feature(geometry = v, properties={"Height": str(height_avg)}))
+            polygon.append(v)
+        p = Polygon(polygon)
+        features.append(Feature(geometry = p, properties={"Height": str(height_avg)}))
+
+    feature_collection = FeatureCollection(features)
+    with open('./fileout/output.geojson', 'w') as geojson:
+        dump(feature_collection, geojson)
+
+    # # Visualise convex-hulls -> to obj file
+    # hulls_vertices = []
+    # hulls_faces = []
+    # id_p = 0
+    # for hull in hulls:
+    #     face_ = []
+    #     for vertex in hull:
+    #         v = [vertex[0], vertex[1],10]
+    #         hulls_vertices.append(v)
+    #         face_.append(id_p)
+    #         id_p += 1
+    #     hulls_faces.append(face_)
+
+    # # write file (hulls obj)
+    # with open("./fileout/hulls.obj", "w") as file:
+    #     for v in hulls_vertices:
+    #         file.write("v ")
+    #         file.write(str(v[0]))
+    #         file.write(" ")
+    #         file.write(str(v[1]))
+    #         file.write(" ")
+    #         file.write(str(v[2]))
+    #         file.write("\n")
+    #     file.write("Oo\n")
+    #     for f in hulls_faces:
+    #         i = 0
+    #         file.write("f ")
+    #         while i < len(f):
+    #             file.write(str(f[i]+1))
+    #             file.write(" ")
+    #             i += 1
+    #         file.write("\n")
+    #     file.close()
 
     # Store new attribute per building
     write_txt_cluster(dict_obstacles_total, obstacle_pts_total, "./fileout/clusters.txt")
