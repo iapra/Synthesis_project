@@ -1,6 +1,7 @@
 # SYNTHESIS PROJECT.2021
 
 import math
+from geojson.geometry import MultiPolygon
 import numpy as np
 import pandas as pd
 from numpy.lib.function_base import corrcoef
@@ -219,6 +220,8 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     tops_total = []
     obstacle_pts_total = []
     hulls = []
+    features = []
+
 
     # ROOF EXPORT IN OBJ FOR VISUALISATION: Check that faces are only roofs and LOD2
     write_obj(vertices, faces, './fileout/roofs_out.obj')
@@ -402,6 +405,20 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         # print("Projected roof area in 2D: ", projected_area_2d)
         # print("Roof area in 3D: ", area_3d)
 
+            # Write files to geoJSON
+        for hull in hulls:
+            height_avg = 0
+            polygon = []
+            for vertex in hull:
+                height_avg += vertex[2]
+                v = Point([vertex[0], vertex[1]])
+                polygon.append(v)
+            v_last = Point([hull[0][0], hull[0][1]])
+            polygon.append (v_last)
+            height_avg / len(hull)
+            p = Polygon([polygon])
+            features.append(Feature(geometry = p, properties={"Height": str(height_avg), "Building": str(building_nb)}))
+
 
     # Visualise clusters of obstacle points -> txt file
     # KD tree for the tops
@@ -418,21 +435,20 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         dict_obstacles_total[str(id)].append(id_)
         id_ += 1
 
-    # Write files to geoJSON
-    features = []
-    for hull in hulls:
-        height_avg = 0
-        for vertex in hull:
-            height_avg += vertex[2]
-        height_avg / len(hull)
-
-        polygon = []
-        for vertex in hull:
-            v = Point([vertex[0], vertex[1], height_avg])
-            #features.append(Feature(geometry = v, properties={"Height": str(height_avg)}))
-            polygon.append(v)
-        p = Polygon(polygon)
-        features.append(Feature(geometry = p, properties={"Height": str(height_avg)}))
+    # # Write files to geoJSON
+    # features = []
+    # for hull in hulls:
+    #     height_avg = 0
+    #     polygon = []
+    #     for vertex in hull:
+    #         height_avg += vertex[2]
+    #         v = Point([vertex[0], vertex[1]])
+    #         polygon.append(v)
+    #     v_last = Point([hull[0][0], hull[0][1]])
+    #     polygon.append (v_last)
+    #     height_avg / len(hull)
+    #     p = Polygon([polygon])
+    #     features.append(Feature(geometry = p, properties={"Height": str(height_avg)}))
 
     feature_collection = FeatureCollection(features)
     with open('./fileout/output.geojson', 'w') as geojson:
