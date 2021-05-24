@@ -225,9 +225,9 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     # OBSTACLE EXTRACTION
     set_point = set()
     building_nb = 1
+    projected_area_2d = 0.00
+    area_3d = 0.00
     for building in faces:
-        projected_area_2d = 0.00
-        area_3d = 0.00
         obstacle_pts = []
         for triangle in building:
             subset = []
@@ -259,15 +259,29 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                         obstacle_pts_total.append(p)
                     else: continue
 
+
+        # Clean obstacle points
+        obstacle_pts_final = []
+        kd_first = scipy.spatial.KDTree(obstacle_pts)
+        for point_ in obstacle_pts:
+            # Nearest neighbour search
+            _dist, _id = kd_first.query(point_, k=2)
+            if _dist[1] < 0.8:
+                obstacle_pts_final.append(point_)
+            else: continue
+        #print(len(obstacle_pts))
+        #print(len(obstacle_pts_final))
+        if len(obstacle_pts_final) < 2: continue
+
         # Manual clustering
-        kd = scipy.spatial.KDTree(obstacle_pts)
+        kd = scipy.spatial.KDTree(obstacle_pts_final)
         tops_id = set()
         tops = []
         stack = deque()
         stacked_points_id = set()
 
         pid = 0
-        for p in obstacle_pts:
+        for p in obstacle_pts_final:
             stacked_points_id.add(pid)
             stack.append(pid)
             top = pid
@@ -278,10 +292,10 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
                 # We get the higher point in the radius search
                 higher_id = current_id
-                subset_id = kd.query_ball_point(obstacle_pts[current_id], r = 4)
+                subset_id = kd.query_ball_point(obstacle_pts_final[current_id], r = 4)
 
                 for id in subset_id:
-                    if obstacle_pts[id][2] > obstacle_pts[higher_id][2]:
+                    if obstacle_pts_final[id][2] > obstacle_pts_final[higher_id][2]:
                         higher_id = id
                 
                 if higher_id not in stacked_points_id:
@@ -293,8 +307,8 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             # We add the top to the top of the obstacles
             if top not in tops_id:
                 tops_id.add(top)
-                tops.append(obstacle_pts[top])
-                tops_total.append(obstacle_pts[top])
+                tops.append(obstacle_pts_final[top])
+                tops_total.append(obstacle_pts_final[top])
             else: continue
 
         print("Number of clusters for building ",building_nb, ": ", len(tops))
@@ -309,29 +323,25 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             id_total = int(id + len(dict_obstacles_total))
             dict_obstacles_total[str(id_total)] = list()
         id_ = 0
-        for p in obstacle_pts:
+        for p in obstacle_pts_final:
             # Nearest neighbour search
             dist, id = kd_tops.query(p, k=1)
-            # if dist < 3:
-            #     dict_obstacles[str(id)].append(id_)
-            # else: 
-            #     continue
             dict_obstacles[str(id)].append(id_)
             id_ += 1
 
 
         # Check and visualise clusters
-        #write_txt_cluster(dict_obstacles, obstacle_pts, "./fileout/cluster.txt")
+        #write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")
 
         # #Birch clustering
 
         # # define dataset
-        # nb_cluster = round(len(obstacle_pts)/5)
-        # X, _ = make_classification(n_samples=len(obstacle_pts),
+        # nb_cluster = round(len(obstacle_pts_final)/5)
+        # X, _ = make_classification(n_samples=len(obstacle_pts_final),
         #         n_features=nb_cluster, n_informative=nb_cluster,
         #         n_redundant=0, n_clusters_per_class=1)
         # #make blobs - let's try another way
-        # # dataset = make_blobs(n_samples=len(obstacle_pts), n_features=nb_cluster, centers=nb_cluster, cluster_std=1.6, random_state=50)
+        # # dataset = make_blobs(n_samples=len(obstacle_pts_final), n_features=nb_cluster, centers=nb_cluster, cluster_std=1.6, random_state=50)
 
         # # define the model
         # model = Birch(threshold=0.01, n_clusters=nb_cluster)
@@ -355,7 +365,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         for key in dict_obstacles:
             array_point3d = []
             for val in dict_obstacles[key]:
-                point_arr = [obstacle_pts[val][0], obstacle_pts[val][1], obstacle_pts[val][2]]
+                point_arr = [obstacle_pts_final[val][0], obstacle_pts_final[val][1], obstacle_pts_final[val][2]]
                 array_point3d.append(point_arr)
             if len(array_point3d) > 3:                  # add condition of number of points in the cluster
                 clusters_arr.append(array_point3d)
@@ -379,7 +389,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             obstacle_area += a
 
         # Solar potential area computation
-        # For now we do an ugly cross proportional cross product! (TODO - project conv-hull on 3d surfaces)
+        # For now we do an ugly cross proportional cross product!
         obst_3d = (obstacle_area * area_3d) / projected_area_2d 
         new_attribute_area3d = area_3d - obst_3d
         new_attribute_percent = (new_attribute_area3d / area_3d) *100
@@ -446,6 +456,9 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     write_ply(obstacle_pts_total, './fileout/points_obtacle.ply')
     #write_json(input_json, "./fileout/extract_out.json", dict_buildings)
     #print (dict_buildings)
+    
+    #print("area 3D = ", area_3d)
+    #print("area 2D = ", projected_area_2d)
 
     return
 
