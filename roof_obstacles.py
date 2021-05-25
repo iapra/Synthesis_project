@@ -3,6 +3,7 @@
 import math
 from geojson.geometry import MultiPolygon
 import numpy as np
+from numpy.core.einsumfunc import _parse_possible_contraction
 import pandas as pd
 from numpy.lib.function_base import corrcoef
 import scipy.spatial
@@ -150,7 +151,6 @@ def get_height_difference(vertices):
     height_diff = max(z) - min(z)
     return height_diff
 
-
 def normal_check(in_point):
     z1 = 0
     z2 = 0
@@ -167,6 +167,22 @@ def normal_check(in_point):
         return False
     else:
         return True
+
+def get_slope(p1, p2):
+    #print(p1)
+    #print(p2)
+    length = math.sqrt( (p2[0]-p1[[0]])**2 + (p2[1]-p1[[1]])**2 + (p2[2]-p1[[2]])**2 )
+    length_2d = math.sqrt( (p2[0]-p1[[0]])**2 + (p2[1]-p1[[1]])**2 )
+    try:
+        return math.acos(length_2d / length)
+    except:
+        return 0
+
+    # run = math.sqrt( (p2[0]-p1[0])**2 + (p2[1]-p1[1])**2 )
+    # rise = abs(p2[2]-p1[2])
+    # slope = rise/run
+    # print(slope)
+    # return slope
 
 def write_obj(vertices, faces, fileout):
     vertices_out = []
@@ -235,7 +251,7 @@ def write_txt_cluster(dict_obstacles, obstacle_pts, fileout):
         f.close()
 
 def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
-    extract_nb = 6  # variable to name properly the output files
+    extract_nb = "extract1_n_rad7" # variable to name properly the output files
 
     print("Number of vertices: ", len(vertices))
     print("Number of buildings: ", len(faces))
@@ -258,6 +274,9 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     for building in faces:
         obstacle_pts = []
         rel_height = 0
+        max_height = 0
+        max_point = []
+        min_point = []
         for triangle in building:
             subset = []
             assert (len(triangle) == 3)
@@ -284,9 +303,16 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                 for p in subset:
                     dist = shortest_distance(p, plane_equation(p1,p2,p3))
                     if dist > threshold: 
+                        if len(max_point) == 0: max_point.append(p)
+                        if len(min_point) == 0: min_point.append(p)
                         obstacle_pts.append(p)
                         obstacle_pts_total.append(p)
                         rel_height += dist
+                        if p[2] > max_point[-1][2]:
+                            max_height = dist
+                            max_point.append(point)
+                        if p[2] < min_point[-1][2]:
+                            min_point.append(point)
                     else: continue
         
         # Clean obstacle points
@@ -446,6 +472,8 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             features.append(Feature(geometry = p, properties={"CityObject": str(building_id),
                                                             "Absolute height": str(height_avg), 
                                                             "Relative height": str(rel_height), 
+                                                            "Max obstacle height": str(max_height),
+                                                            "Slope": str(get_slope(min_point[-1], max_point[-1]))
                                                             }))
 
         building_nb += 1
