@@ -150,6 +150,24 @@ def get_height_difference(vertices):
     height_diff = max(z) - min(z)
     return height_diff
 
+
+def normal_check(in_point):
+    z1 = 0
+    z2 = 0
+    z3 = 1
+    nx = in_point[3]
+    ny = in_point[4]
+    nz = in_point[5]
+
+    # angle between two vectors in radians
+    angle = np.arccos([((z1 * nx) + (z2 * ny) + (z3 * nz))
+                       / (math.sqrt((z1 * z1) + (z2 * z2) + (z3 * z3)) * math.sqrt((nx * nx) + (ny * ny) + (nz * nz)))])
+
+    if 50 < math.degrees(angle):  # this can be changed
+        return False
+    else:
+        return True
+
 def write_obj(vertices, faces, fileout):
     vertices_out = []
     faces_out = []

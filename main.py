@@ -9,7 +9,7 @@ import json
 # -- *all* code goes into 'roof_obstacles'
 import roof_obstacles
 
-input_ply = "./data/extract1.ply"
+input_ply = "./data/extract1_n_rad7.ply"
 #input_ply = "./data/one_building.ply"
 input_obj = "./data/3d_one_building.obj"
 output_file = "./data/out.json"
@@ -75,10 +75,10 @@ def main():
     data_pd = pd.DataFrame(data)                            # Convert to DataFrame, because DataFrame can parse structured data
 
     # THIS KEEPS ALL PROPERTIES (nb of returns, etc)
-    # data_np = np.zeros(data_pd.shape, dtype=np.float)   # Initialize the array of stored data
-    # property_names = data[0].dtype.names                # read the name of the property
-    # for i, name in enumerate(property_names):           # Read data according to property, so as to ensure that the data read is the same data type.
-    #     data_np[:, i] = data_pd[name]
+    data_np = np.zeros(data_pd.shape, dtype=np.float64)   # Initialize the array of stored data
+    property_names = data[0].dtype.names                # read the name of the property
+    for i, name in enumerate(property_names):           # Read data according to property, so as to ensure that the data read is the same data type.
+        data_np[:, i] = data_pd[name]
 
     # THIS KEEPS ONLY x,y,z
     point_cloud = np.zeros((data_pd.shape[0], 3), dtype=float)  # Initialize the array of stored data
@@ -94,7 +94,16 @@ def main():
 
     # -- detect obstacles
     #roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file)
-    roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
+    # roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
+
+    # to check if normal_check function works
+    points = []
+    for point in data_np:
+        if roof_obstacles.normal_check(point):
+            one_list = [point[0], point[1], point[2]]
+            points.append(one_list)
+
+    roof_obstacles.write_ply(points, './fileout/points_normal_test_rad7.ply')
 
 
 if __name__ == '__main__':
