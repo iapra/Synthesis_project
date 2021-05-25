@@ -87,7 +87,6 @@ def main():
         if (i > 2): continue
         point_cloud[:, i] = data_pd[name]
 
-
     # -- READ OBJ: store the input in arrays
     #read_obj(input_obj)
     read_json(input_json)
@@ -95,15 +94,16 @@ def main():
     # -- detect obstacles
     #roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file)
     # roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
+    roof_obstacles.detect_obstacles(data_np, json_vertices, json_boundaries, output_file, input_json)
 
     # to check if normal_check function works
-    points = []
-    for point in data_np:
-        if roof_obstacles.normal_check(point):
-            one_list = [point[0], point[1], point[2]]
-            points.append(one_list)
-
-    roof_obstacles.write_ply(points, './fileout/points_normal_test_rad7.ply')
+    # points = []
+    # for point in data_np:
+    #     if roof_obstacles.normal_check(point):
+    #         one_list = [point[0], point[1], point[2]]
+    #         points.append(one_list)
+    #
+    # roof_obstacles.write_ply(points, './fileout/points_normal_test_rad7.ply')
 
 
 if __name__ == '__main__':

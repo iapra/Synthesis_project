@@ -206,9 +206,10 @@ def write_obj(vertices, faces, fileout):
 def write_ply (obstacle_pts, fileout):
     tuples = []
     for p in obstacle_pts:
+        new_p = [p[0], p[1], p[2]]
             #for obstacle_point in obstacle_arr:
-            point = tuple(p)
-            tuples.append(point)
+        point = tuple(new_p)
+        tuples.append(point)
     a = np.array(tuples, dtype=[('x', 'f8'), ('y', 'f8'), ('z', 'f8')])
     print("Number of points in PLY file: ", len(obstacle_pts))
     # write PLY
@@ -268,11 +269,11 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
             id_point = 0
             for point in point_cloud:
-                if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point) and id_point not in set_point:
+                if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point) and normal_check(point) and id_point not in set_point:
                     set_point.add(id_point)
                     subset.append(point)
                 id_point += 1
-                
+
             # Triangle is vertical?
             if len(subset) == 0: 
                 continue
@@ -495,7 +496,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     #         face_.append(id_p)
     #         id_p += 1
     #     hulls_faces.append(face_)
-
+    #
     # # write file (hulls obj)
     # with open("./fileout/hulls.obj", "w") as file:
     #     for v in hulls_vertices:
