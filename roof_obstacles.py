@@ -77,7 +77,6 @@ def isInside(p1,p2,p3, p):
     else:
         return False
 
-
 def isAbove(p1, p2, p3, p):
     det_above = np.linalg.det([[p1[0], p1[1], p1[2], 1],
                                [p2[0], p2[1], p2[2], 1],
@@ -87,7 +86,6 @@ def isAbove(p1, p2, p3, p):
         return True
     else:
         return False
-
 
 #unit normal vector of plane defined by points a, b, and c
 def unit_normal(a, b, c):
@@ -254,7 +252,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
     dict_buildings = {}
     dict_obstacles_total = {}
-    tops_total = []
     obstacle_pts_total = []
     hulls = []
     features = []
@@ -346,6 +343,8 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             dict_obstacles[str(k_means_labels[count_])].append(count_)
             count_ += 1
 
+        #write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")
+
         #Create np-array of each cluster
         clusters_arr = []
         for key in dict_obstacles:
@@ -407,39 +406,16 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                                                             }))
 
         building_nb += 1
-
-    # Visualise clusters of obstacle points -> txt file
-    # KD tree for the tops
-    # kd_tops_total = scipy.spatial.KDTree(tops_total)
-
-    # # search for each point its closest top-point
-    # dict_obstacles_total = {}
-    # for id in range(len(tops_total)):
-    #     dict_obstacles_total[str(id)] = list()
-
-    # id_ = 0
-    # for p in obstacle_pts_total:
-    #     dist, id = kd_tops_total.query(p, k=1)
-    #     dict_obstacles_total[str(id)].append(id_)
-    #     id_ += 1
-
-    # Write files to geoJSON
-    features = []
-    for hull in hulls:
-        height_avg = 0
-        polygon = []
-        for vertex in hull:
-            height_avg += vertex[2]
-            v = Point([vertex[0], vertex[1]])
-            polygon.append(v)
-        v_last = Point([hull[0][0], hull[0][1]])
-        polygon.append (v_last)
-        height_avg / len(hull)
-        p = Polygon([polygon])
-        features.append(Feature(geometry = p, properties={"Height": str(height_avg)}))
-
-    feature_collection = FeatureCollection(features)
+        
+    crs = {
+        "type": "name",
+        "properties": {
+            "name": "EPSG:28992"
+        }
+    }
+    feature_collection = FeatureCollection(features, crs = crs)
     with open(str('./fileout/output_extract' + str(extract_nb) + '.geojson'), 'w') as geojson:
+
         dump(feature_collection, geojson)
 
     # # Visualise convex-hulls -> to obj file
