@@ -246,7 +246,7 @@ def write_txt_cluster(dict_obstacles, obstacle_pts, fileout):
         f.close()
 
 def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
-    extract_nb = "extract1_n_rad7" # variable to name properly the output files
+    extract_nb = "3_n_rad7" # variable to name properly the output files
 
     print("Number of vertices: ", len(vertices))
     print("Number of buildings: ", len(faces))
@@ -312,7 +312,9 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         # Clean obstacle points
         obstacle_pts_final = []
         obstacle_pts_final2d = []
-        kd_first = scipy.spatial.KDTree(obstacle_pts)
+        try:
+            kd_first = scipy.spatial.KDTree(obstacle_pts)
+        except: print("shiit")
         for point_ in obstacle_pts:
             # Nearest neighbour search
             _dist, _id = kd_first.query(point_, k=2)
@@ -331,10 +333,14 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
         # K-means
         nb_cluster = round(len(obstacle_pts_final2d)/7)
-        k_means = KMeans(init='random', n_clusters=3, n_init=10)
-        k_means.fit(obstacle_pts_final2d)
-        k_means_labels = k_means.labels_
+        k_means = KMeans(init='random', n_clusters=nb_cluster, n_init=10)
+        try:
+            k_means.fit(obstacle_pts_final2d)
+            k_means_labels = k_means.labels_
         #print(k_means_labels)
+        except: 
+            print("oh nooo")
+            continue
 
         dict_obstacles = {}
         for id in range(len(k_means_labels)):
@@ -436,42 +442,41 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     }
     feature_collection = FeatureCollection(features, crs = crs)
     with open(str('./fileout/output_extract' + str(extract_nb) + '.geojson'), 'w') as geojson:
-
         dump(feature_collection, geojson)
 
-    # # Visualise convex-hulls -> to obj file
-    # hulls_vertices = []
-    # hulls_faces = []
-    # id_p = 0
-    # for hull in hulls:
-    #     face_ = []
-    #     for vertex in hull:
-    #         v = [vertex[0], vertex[1],10]
-    #         hulls_vertices.append(v)
-    #         face_.append(id_p)
-    #         id_p += 1
-    #     hulls_faces.append(face_)
-    #
-    # # write file (hulls obj)
-    # with open("./fileout/hulls.obj", "w") as file:
-    #     for v in hulls_vertices:
-    #         file.write("v ")
-    #         file.write(str(v[0]))
-    #         file.write(" ")
-    #         file.write(str(v[1]))
-    #         file.write(" ")
-    #         file.write(str(v[2]))
-    #         file.write("\n")
-    #     file.write("Oo\n")
-    #     for f in hulls_faces:
-    #         i = 0
-    #         file.write("f ")
-    #         while i < len(f):
-    #             file.write(str(f[i]+1))
-    #             file.write(" ")
-    #             i += 1
-    #         file.write("\n")
-    #     file.close()
+    # Visualise convex-hulls -> to obj file
+    hulls_vertices = []
+    hulls_faces = []
+    id_p = 0
+    for hull in hulls:
+        face_ = []
+        for vertex in hull:
+            v = [vertex[0], vertex[1],10]
+            hulls_vertices.append(v)
+            face_.append(id_p)
+            id_p += 1
+        hulls_faces.append(face_)
+    
+    # write file (hulls obj)
+    with open('./fileout/hulls_extract' + str(extract_nb) + '.obj', "w") as file:
+        for v in hulls_vertices:
+            file.write("v ")
+            file.write(str(v[0]))
+            file.write(" ")
+            file.write(str(v[1]))
+            file.write(" ")
+            file.write(str(v[2]))
+            file.write("\n")
+        file.write("Oo\n")
+        for f in hulls_faces:
+            i = 0
+            file.write("f ")
+            while i < len(f):
+                file.write(str(f[i]+1))
+                file.write(" ")
+                i += 1
+            file.write("\n")
+        file.close()
 
     # Store new attribute per building
     write_txt_cluster(dict_obstacles_total, obstacle_pts_total, "./fileout/clusters.txt")
