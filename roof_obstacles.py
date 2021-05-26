@@ -12,8 +12,10 @@ from collections import UserString, deque
 from numpy import unique, where
 from sklearn.datasets import make_classification
 from sklearn.cluster import Birch
-from sklearn.datasets import make_blobs
-from matplotlib import pyplot
+from sklearn.cluster import KMeans
+from matplotlib import pyplot as plt
+import seaborn as sns
+from sklearn.datasets.samples_generator import make_blobs
 from geojson import Point, Polygon, Feature, FeatureCollection, dump
 import json
 import os
@@ -178,12 +180,6 @@ def get_slope(p1, p2):
     except:
         return 0
 
-    # run = math.sqrt( (p2[0]-p1[0])**2 + (p2[1]-p1[1])**2 )
-    # rise = abs(p2[2]-p1[2])
-    # slope = rise/run
-    # print(slope)
-    # return slope
-
 def write_obj(vertices, faces, fileout):
     vertices_out = []
     faces_out = []
@@ -317,106 +313,40 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         
         # Clean obstacle points
         obstacle_pts_final = []
+        obstacle_pts_final2d = []
         kd_first = scipy.spatial.KDTree(obstacle_pts)
         for point_ in obstacle_pts:
             # Nearest neighbour search
             _dist, _id = kd_first.query(point_, k=2)
             if _dist[1] < 0.8:
                 obstacle_pts_final.append(point_)
+                obstacle_pts_final2d.append(point_[0:2])
             else: continue
         #print(len(obstacle_pts))
         #print(len(obstacle_pts_final))
         if len(obstacle_pts_final) < 2: continue
+        if len(obstacle_pts_final2d) < 2: continue
         rel_height /= len(obstacle_pts)
-
-        # Manual clustering
-        kd = scipy.spatial.KDTree(obstacle_pts_final)
-        tops_id = set()
-        tops = []
-        stack = deque()
-        stacked_points_id = set()
-
-        pid = 0
-        for p in obstacle_pts_final:
-            stacked_points_id.add(pid)
-            stack.append(pid)
-            top = pid
-            while (len(stack) > 0):
-                assert(len(stack) == 1)
-                current_id = stack[-1]
-                stack.pop()
-
-                # We get the higher point in the radius search
-                higher_id = current_id
-                subset_id = kd.query_ball_point(obstacle_pts_final[current_id], r = 4)
-
-                for id in subset_id:
-                    if obstacle_pts_final[id][2] > obstacle_pts_final[higher_id][2]:
-                        higher_id = id
-                
-                if higher_id not in stacked_points_id:
-                    stack.append(higher_id)
-                    stacked_points_id.add(higher_id)
-                else: 
-                    top = higher_id
-            pid += 1
-            # We add the top to the top of the obstacles
-            if top not in tops_id:
-                tops_id.add(top)
-                tops.append(obstacle_pts_final[top])
-                tops_total.append(obstacle_pts_final[top])
-            else: continue
-
-        print("Number of obstacle detected for building ",building_nb, ": ", len(tops))
-
-        # KD tree for the tops
-        kd_tops = scipy.spatial.KDTree(tops)
-
-        # search for each point its closest top-point
-        dict_obstacles = {}
-        for id in range(len(tops)):
-            dict_obstacles[str(id)] = list()
-            id_total = int(id + len(dict_obstacles_total))
-            dict_obstacles_total[str(id_total)] = list()
-        id_ = 0
-        for p in obstacle_pts_final:
-            # Nearest neighbour search
-            dist, id = kd_tops.query(p, k=1)
-            dict_obstacles[str(id)].append(id_)
-            id_ += 1
-
 
         # Check and visualise clusters
         #write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")
 
-        # #Birch clustering
+        # K-means
+        nb_cluster = round(len(obstacle_pts_final2d)/7)
+        k_means = KMeans(init='random', n_clusters=3, n_init=10)
+        k_means.fit(obstacle_pts_final2d)
+        k_means_labels = k_means.labels_
+        #print(k_means_labels)
 
-        # # define dataset
-        # nb_cluster = round(len(obstacle_pts_final)/5)
-        # X, _ = make_classification(n_samples=len(obstacle_pts_final),
-        #         n_features=nb_cluster, n_informative=nb_cluster,
-        #         n_redundant=0, n_clusters_per_class=1)
-        # #make blobs - let's try another way
-        # # dataset = make_blobs(n_samples=len(obstacle_pts_final), n_features=nb_cluster, centers=nb_cluster, cluster_std=1.6, random_state=50)
+        dict_obstacles = {}
+        for id in range(len(k_means_labels)):
+            dict_obstacles[str(k_means_labels[id])] = list()
+        count_ = 0
+        for p in obstacle_pts_final:
+            dict_obstacles[str(k_means_labels[count_])].append(count_)
+            count_ += 1
 
-        # # define the model
-        # model = Birch(threshold=0.01, n_clusters=nb_cluster)
-        # # fit the model
-        # model.fit(X)
-        # # assign a cluster to each example
-        # yhat = model.predict(X)
-        # # retrieve unique clusters
-        # clusters = unique(yhat)
-        # # create scatter plot for samples from each cluster
-        # for cluster in clusters:
-        #     # get row indexes for samples with this cluster
-        #     row_ix = where(yhat == cluster)
-        #     # create scatter of these samples
-        #     pyplot.scatter(X[:,0], X[:,1], c=yhat)
-        # # show the plot
-        # #pyplot.show()
-
-        # Create np-array of each cluster
+        #Create np-array of each cluster
         clusters_arr = []
         for key in dict_obstacles:
             array_point3d = []
@@ -480,33 +410,33 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
     # Visualise clusters of obstacle points -> txt file
     # KD tree for the tops
-    kd_tops_total = scipy.spatial.KDTree(tops_total)
+    # kd_tops_total = scipy.spatial.KDTree(tops_total)
 
-    # search for each point its closest top-point
-    dict_obstacles_total = {}
-    for id in range(len(tops_total)):
-        dict_obstacles_total[str(id)] = list()
+    # # search for each point its closest top-point
+    # dict_obstacles_total = {}
+    # for id in range(len(tops_total)):
+    #     dict_obstacles_total[str(id)] = list()
 
-    id_ = 0
-    for p in obstacle_pts_total:
-        dist, id = kd_tops_total.query(p, k=1)
-        dict_obstacles_total[str(id)].append(id_)
-        id_ += 1
+    # id_ = 0
+    # for p in obstacle_pts_total:
+    #     dist, id = kd_tops_total.query(p, k=1)
+    #     dict_obstacles_total[str(id)].append(id_)
+    #     id_ += 1
 
-    # # Write files to geoJSON
-    # features = []
-    # for hull in hulls:
-    #     height_avg = 0
-    #     polygon = []
-    #     for vertex in hull:
-    #         height_avg += vertex[2]
-    #         v = Point([vertex[0], vertex[1]])
-    #         polygon.append(v)
-    #     v_last = Point([hull[0][0], hull[0][1]])
-    #     polygon.append (v_last)
-    #     height_avg / len(hull)
-    #     p = Polygon([polygon])
-    #     features.append(Feature(geometry = p, properties={"Height": str(height_avg)}))
+    # Write files to geoJSON
+    features = []
+    for hull in hulls:
+        height_avg = 0
+        polygon = []
+        for vertex in hull:
+            height_avg += vertex[2]
+            v = Point([vertex[0], vertex[1]])
+            polygon.append(v)
+        v_last = Point([hull[0][0], hull[0][1]])
+        polygon.append (v_last)
+        height_avg / len(hull)
+        p = Polygon([polygon])
+        features.append(Feature(geometry = p, properties={"Height": str(height_avg)}))
 
     feature_collection = FeatureCollection(features)
     with open(str('./fileout/output_extract' + str(extract_nb) + '.geojson'), 'w') as geojson:
