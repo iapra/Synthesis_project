@@ -15,12 +15,13 @@ from sklearn.cluster import Birch
 from sklearn.cluster import KMeans
 from matplotlib import pyplot as plt
 import seaborn as sns
-from sklearn.datasets.samples_generator import make_blobs
+# from sklearn.datasets.samples_generator import make_blobs
 from geojson import Point, Polygon, Feature, FeatureCollection, dump
 import json
 import os
 import sys
 import shutil
+import alphashape
 
 #-- to speed up the nearest neighbour us a kd-tree
 # https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html#scipy.spatial.KDTree
@@ -357,15 +358,35 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
         # Obstacle points convex-hull
         for cluster_ in clusters_arr:
+            point_set = []
+            points_rounded = []
             cluster = np.array(cluster_)
-            try:
-                hull = scipy.spatial.ConvexHull(cluster[:,:2])
-                hull_arr = []
-                for vertex_id in hull.vertices:
-                    hull_arr.append(cluster[vertex_id])
-                hulls.append(hull_arr)
-            except:
-                continue
+            # print(cluster_)
+            for p in cluster:
+                new = []
+                for x in p:
+                    new.append(round(x, 3))
+                points_rounded.append(new)
+            for t in points_rounded:
+                if tuple(t[:2]) not in point_set:
+                    point_set.append(tuple(t[:2]))
+            print(point_set)
+            print(points_rounded)
+            # print(point_set)
+            # fig, ax = plt.subplots()
+            # ax.scatter(*zip(*point_set))
+            # plt.show()
+
+            # # try:
+            alpha = alphashape.alphashape(point_set, 2.0)
+            print(alpha)
+                # hull_arr = []
+                # for vertex_id in alpha.vertices:
+                #     print(vertex_id)
+                #     hull_arr.append(cluster[vertex_id])
+                # hulls.append(hull_arr)
+            # except:
+            #     continue
 
         # Area calculation of hulls
         obstacle_area = 0
