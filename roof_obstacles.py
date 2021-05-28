@@ -384,13 +384,15 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                 obstacle_pts_.append(_point_)
         
         # We ge rid of isolated points
-        kd_first = scipy.spatial.KDTree(extract_xyz(obstacle_pts_))
-        for _point_2 in obstacle_pts_:
-            query2 = kd_first.query_ball_point(_point_2[0:3], r=1)
-            if(len(query2)) > 2:
-                obstacle_pts_final.append(_point_2)
-                obstacle_pts_final2d.append(_point_2[0:2])
-                obstacle_pts_total.append(_point_2)
+        if len(obstacle_pts_) < 2: continue
+        else:
+            kd_first = scipy.spatial.KDTree(extract_xyz(obstacle_pts_))
+            for _point_2 in obstacle_pts_:
+                query2 = kd_first.query_ball_point(_point_2[0:3], r=1)
+                if(len(query2)) > 2:
+                    obstacle_pts_final.append(_point_2)
+                    obstacle_pts_final2d.append(_point_2[0:2])
+                    obstacle_pts_total.append(_point_2)
 
             # query = kd_first.query_ball_point(_point_[0:3], r=1)
             # if(len(query)) > 2:
@@ -408,9 +410,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             #         obstacle_pts_final2d.append(_point_[0:2])
             #         obstacle_pts_total.append(_point_)
             
-
-        if len(obstacle_pts_final) < 2: continue
-        if len(obstacle_pts_final2d) < 2: continue
         rel_height /= len(obstacle_pts)
 
         # Check and visualise clusters
@@ -432,6 +431,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         #     count_ += 1
 
         # Manual clustering
+        if len(obstacle_pts_final) < 2: continue
         kd = scipy.spatial.KDTree(obstacle_pts_final)
         tops_id = set()
         tops = []
