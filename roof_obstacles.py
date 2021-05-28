@@ -349,42 +349,66 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         print("length obstacles: ", len(obstacle_pts))
         kd_total = scipy.spatial.KDTree(point_cloud[:, 0:3])
 
-        # while (len(stack_first) > 0):
-        #     current_p = stack_first[-1]
-        #     #print(current_p)
-        #     stack_first.pop()
-        #     n1 = get_normal(current_p)
-        #     #print(n1)
-        #     _subset_id = kd_total.query_ball_point(current_p[0:3], r=1)
-        #     #print(len(_subset_id))
-        #     for subset_point_id in _subset_id:
-        #         n2 = get_normal(point_cloud[subset_point_id])
-        #         #print(n2)
-        #         if n2 >= 0.99 * n1 and n2 <= 1.01 * n1 and subset_point_id not in set_point:
-        #             set_point.add(subset_point_id)
-        #             obstacle_pts.append(point_cloud[subset_point_id])
-        #             #obstacle_pts_total.append(point_cloud[subset_point_id])
-        #             stack_first.append(point_cloud[subset_point_id])
-        #         else: continue
-        # print("length obstacles then: ", len(obstacle_pts))
+        while (len(stack_first) > 0):
+            current_p = stack_first[-1]
+            #print(current_p)
+            stack_first.pop()
+            n1 = get_normal(current_p)
+            #print(n1)
+            _subset_id = kd_total.query_ball_point(current_p[0:3], r=1)
+            #print(len(_subset_id))
+            for subset_point_id in _subset_id:
+                n2 = get_normal(point_cloud[subset_point_id])
+                #print(n2)
+                if n2 >= 0.99 * n1 and n2 <= 1.01 * n1 and subset_point_id not in set_point:
+                    set_point.add(subset_point_id)
+                    obstacle_pts.append(point_cloud[subset_point_id])
+                    #obstacle_pts_total.append(point_cloud[subset_point_id])
+                    stack_first.append(point_cloud[subset_point_id])
+                else: continue
+        print("length obstacles then: ", len(obstacle_pts))
 
         # CLEAN OBSTACLE POINTS
+        obstacle_pts_ = []
         obstacle_pts_final = []
         obstacle_pts_final2d = []
-        kd_first = scipy.spatial.KDTree(extract_xyz(obstacle_pts))
-        # We ge rid of isolated points
+        #kd_first = scipy.spatial.KDTree(extract_xyz(obstacle_pts))
         for _point_ in obstacle_pts:
-            # Nearest neighbour search
-            query = kd_first.query_ball_point(_point_[0:3], r=1.5)
-            #print(len(query))
-            #print(get_normal(_point_))
-            if(len(query)) > 2 and get_normal(_point_) < 35:
-                obstacle_pts_final.append(_point_)
-                obstacle_pts_final2d.append(_point_[0:2])
-                obstacle_pts_total.append(_point_)
+            # Radius search
+            query1 = kd_total.query_ball_point(_point_[0:3], r=1)
+            count_higher = 0 
+            for id_p in query1:
+                if point_cloud[id_p][2] > (_point_[2] + 0.1):
+                    count_higher += 1
+            if count_higher < 2:
+                obstacle_pts_.append(_point_)
+        
+        # We ge rid of isolated points
+        kd_first = scipy.spatial.KDTree(extract_xyz(obstacle_pts_))
+        for _point_2 in obstacle_pts_:
+            query2 = kd_first.query_ball_point(_point_2[0:3], r=1)
+            if(len(query2)) > 2:
+                obstacle_pts_final.append(_point_2)
+                obstacle_pts_final2d.append(_point_2[0:2])
+                obstacle_pts_total.append(_point_2)
 
-        #print("length obstacles: ", len(obstacle_pts))
-        #print("length obstacles_final: ", len(obstacle_pts_final))
+            # query = kd_first.query_ball_point(_point_[0:3], r=1)
+            # if(len(query)) > 2:
+            #     query2 = kd_total.query_ball_point(_point_[0:3], r=1)
+            #     #print(len(query2))
+            #     count_higher = 0 
+            #     for id_p in query2:
+            #         if point_cloud[id_p][2] > (_point_[2] + 0.1):
+            #             #print("im breaking, ciao")
+            #             count_higher += 1
+            #     if count_higher < 2:
+            #         print("adding sth")
+            #         set_point2.add(count_pid)
+            #         obstacle_pts_final.append(_point_)
+            #         obstacle_pts_final2d.append(_point_[0:2])
+            #         obstacle_pts_total.append(_point_)
+            
+
         if len(obstacle_pts_final) < 2: continue
         if len(obstacle_pts_final2d) < 2: continue
         rel_height /= len(obstacle_pts)
