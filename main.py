@@ -9,11 +9,11 @@ import json
 # -- *all* code goes into 'roof_obstacles'
 import roof_obstacles
 
-input_ply = "./data/extract1_n_rad7.ply"
+input_ply = "./data/extract2_n_rad7.ply"
 #input_ply = "./data/one_building.ply"
 input_obj = "./data/3d_one_building.obj"
 output_file = "./data/out.json"
-input_json = "./data/extract1.json"
+input_json = "./data/extract2.json"
 
 # Structures to get the input elements:
 vertices = []
@@ -75,17 +75,17 @@ def main():
     data_pd = pd.DataFrame(data)                            # Convert to DataFrame, because DataFrame can parse structured data
 
     # THIS KEEPS ALL PROPERTIES (nb of returns, etc)
-    data_np = np.zeros(data_pd.shape, dtype=np.float64)   # Initialize the array of stored data
+    point_cloud = np.zeros(data_pd.shape, dtype=np.float64)   # Initialize the array of stored data
     property_names = data[0].dtype.names                # read the name of the property
     for i, name in enumerate(property_names):           # Read data according to property, so as to ensure that the data read is the same data type.
-        data_np[:, i] = data_pd[name]
+        point_cloud[:, i] = data_pd[name]
 
     # THIS KEEPS ONLY x,y,z
-    point_cloud = np.zeros((data_pd.shape[0], 3), dtype=float)  # Initialize the array of stored data
+    data_np = np.zeros((data_pd.shape[0], 3), dtype=float)  # Initialize the array of stored data
     property_names = data[0].dtype.names
     for i, name in enumerate(property_names):
         if (i > 2): continue
-        point_cloud[:, i] = data_pd[name]
+        data_np[:, i] = data_pd[name]
 
     # -- READ OBJ: store the input in arrays
     #read_obj(input_obj)
@@ -94,7 +94,7 @@ def main():
     # -- detect obstacles
     #roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file)
     # roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
-    roof_obstacles.detect_obstacles(data_np, json_vertices, json_boundaries, output_file, input_json)
+    roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
 
     # to check if normal_check function works
     # points = []
