@@ -359,17 +359,30 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                 point_set.append(tuple(p))
 
 
+        # for obs in point_set:
+        #     x = obs[0]
+        #     y = obs[1]
+        #     one_hexagon = []
+        #     # one_hexagon.append(obs)
+        #     one_hexagon.append((x + 0.2, y))
+        #     one_hexagon.append((x + 0.1, y + 0.2))
+        #     one_hexagon.append((x - 0.1, y + 0.2))
+        #     one_hexagon.append((x - 0.2, y))
+        #     one_hexagon.append((x - 0.1, y - 0.2))
+        #     one_hexagon.append((x + 0.1, y - 0.2))
+        #     hexagons.append(one_hexagon)
+
         for obs in point_set:
             x = obs[0]
             y = obs[1]
             one_hexagon = []
             # one_hexagon.append(obs)
-            one_hexagon.append((x + 0.2, y))
-            one_hexagon.append((x + 0.1, y + 0.2))
-            one_hexagon.append((x - 0.1, y + 0.2))
-            one_hexagon.append((x - 0.2, y))
-            one_hexagon.append((x - 0.1, y - 0.2))
-            one_hexagon.append((x + 0.1, y - 0.2))
+            one_hexagon.append((x + 0.3, y))
+            one_hexagon.append((x + 0.15, y + 0.3))
+            one_hexagon.append((x - 0.15, y + 0.3))
+            one_hexagon.append((x - 0.3, y))
+            one_hexagon.append((x - 0.15, y - 0.3))
+            one_hexagon.append((x + 0.15, y - 0.3))
             hexagons.append(one_hexagon)
 
     # Visualise convex-hulls -> to obj file
@@ -538,34 +551,34 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         # # print("Projected roof area in 2D: ", projected_area_2d)
         # # print("Roof area in 3D: ", area_3d)
 
-    #     # Write files to geoJSON
-    #     for hull in hulls:
-    #         polygon = []
-    #         for vertex in hull:
-    #             v = Point([vertex[0], vertex[1]])
-    #             polygon.append(v)
-    #         v_last = Point([hull[0][0], hull[0][1]])
-    #         polygon.append(v_last)
-    #         p = Polygon([polygon])
-    #         building_id = get_buildingID(input_json, building_nb - 1)
-    #         features.append(Feature(geometry=p, properties={"CityObject": str(building_id),
-    #                                                         "Relative height": str(rel_height),
-    #                                                         "Max obstacle height": str(max_height),
-    #                                                         "Slope": str(get_slope(min_point[-1], max_point[-1]))
-    #                                                         }))
-    #
-    #     building_nb += 1
-    #
-    # crs = {
-    #     "type": "name",
-    #     "properties": {
-    #         "name": "EPSG:28992"
-    #     }
-    # }
-    # feature_collection = FeatureCollection(features, crs=crs)
-    # with open(str('./fileout/output_extract' + str(extract_nb) + '.geojson'), 'w') as geojson:
-    #
-    #     dump(feature_collection, geojson)
+        # Write files to geoJSON
+        for hexs in hexagons:
+            polygon = []
+            for vertex in hexs:
+                v = Point([vertex[0], vertex[1]])
+                polygon.append(v)
+            v_last = Point([hexs[0][0], hexs[0][1]])
+            polygon.append(v_last)
+            p = Polygon([polygon])
+            building_id = get_buildingID(input_json, building_nb - 1)
+            features.append(Feature(geometry=p, properties={"CityObject": str(building_id),
+                                                            "Relative height": str(rel_height),
+                                                            "Max obstacle height": str(max_height),
+                                                            "Slope": str(get_slope(min_point[-1], max_point[-1]))
+                                                            }))
+
+        building_nb += 1
+
+    crs = {
+        "type": "name",
+        "properties": {
+            "name": "EPSG:28992"
+        }
+    }
+    feature_collection = FeatureCollection(features, crs=crs)
+    with open(str('./fileout/output_extract' + str(extract_nb) + '.geojson'), 'w') as geojson:
+
+        dump(feature_collection, geojson)
 
     # # Visualise convex-hulls -> to obj file
     # hulls_vertices = []
