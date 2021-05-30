@@ -372,7 +372,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         obstacle_pts_ = []
         obstacle_pts_final = []
         obstacle_pts_final2d = []
-        #kd_first = scipy.spatial.KDTree(extract_xyz(obstacle_pts))
         for _point_ in obstacle_pts:
             # Radius search
             query1 = kd_total.query_ball_point(_point_[0:3], r=1)
@@ -390,25 +389,10 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             for _point_2 in obstacle_pts_:
                 query2 = kd_first.query_ball_point(_point_2[0:3], r=1)
                 if(len(query2)) > 2:
+                    # normal rate change parameter: and _point_2[-1] > 0.02
                     obstacle_pts_final.append(_point_2)
                     obstacle_pts_final2d.append(_point_2[0:2])
                     obstacle_pts_total.append(_point_2)
-
-            # query = kd_first.query_ball_point(_point_[0:3], r=1)
-            # if(len(query)) > 2:
-            #     query2 = kd_total.query_ball_point(_point_[0:3], r=1)
-            #     #print(len(query2))
-            #     count_higher = 0 
-            #     for id_p in query2:
-            #         if point_cloud[id_p][2] > (_point_[2] + 0.1):
-            #             #print("im breaking, ciao")
-            #             count_higher += 1
-            #     if count_higher < 2:
-            #         print("adding sth")
-            #         set_point2.add(count_pid)
-            #         obstacle_pts_final.append(_point_)
-            #         obstacle_pts_final2d.append(_point_[0:2])
-            #         obstacle_pts_total.append(_point_)
             
         rel_height /= len(obstacle_pts)
 
