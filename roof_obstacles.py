@@ -21,6 +21,8 @@ import os
 import sys
 import shutil
 # import alphashape
+from shapely.geometry import Polygon
+from shapely.ops import cascaded_union
 #import geopandas as gpd
 
 # -- to speed up the nearest neighbour us a kd-tree
@@ -258,11 +260,11 @@ def write_txt_cluster(dict_obstacles, obstacle_pts, fileout):
             count += 1
         f.close()
 
-def dissolve_geojson(geojson):
-    data = gpd.read_file(geojson)
-    data_columns = data[['CityObject', 'geometry']]
-    dissolved = data_columns.dissolve(by='CityObject')
-    dissolved.to_file("./fileout/dissolved.geojson", driver='GeoJSON')
+# def dissolve_geojson(geojson):
+#     data = gpd.read_file(geojson)
+#     data_columns = data[['CityObject', 'geometry']]
+#     dissolved = data_columns.dissolve(by='CityObject')
+#     dissolved.to_file("./fileout/dissolved.geojson", driver='GeoJSON')
 
 
 def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
@@ -273,9 +275,10 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
     obstacle_pts_total = []
     #tops_total = []
-    #hulls = []
+    hulls = []
+    hulls_polygons = []
     features = []
-    hexagons = []
+    #hexagons = []
 
     # ROOF EXPORT IN OBJ FOR VISUALISATION: Check that faces are only roofs and LOD2
     write_obj(vertices, faces, './fileout/roofs_out.obj')
@@ -379,28 +382,34 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             
         rel_height /= len(obstacle_pts)
 
+        hexagons = []
         for obs in obstacle_pts_final2d:
             x = obs[0]
             y = obs[1]
-            one_hexagon = []
-            one_hexagon.append((x + 0.3, y))
-            one_hexagon.append((x + 0.15, y + 0.3))
-            one_hexagon.append((x - 0.15, y + 0.3))
-            one_hexagon.append((x - 0.3, y))
-            one_hexagon.append((x - 0.15, y - 0.3))
-            one_hexagon.append((x + 0.15, y - 0.3))
+            param = 0.15
+            one_hexagon = Polygon([(x+2*param, y), (x+param, y+2*param), (x-param, y+2*param), 
+                                    (x-2*param, y), (x-param, y-2*param), (x+param, y-2*param)])
             hexagons.append(one_hexagon)
-
-        # We should merge here: one merge element is one hull, 
-        # so we can keep the following code then
+        hull = cascaded_union(hexagons)
+        try:  
+            # Multipolygon case
+            for poly_id in range(len(hull)):
+                coords = list(hull[poly_id].exterior.coords)
+                hulls.append(coords)
+                hulls_polygons.append(hull[poly_id])
+        except:
+            # Polygon case
+            coords = list(hull.exterior.coords)
+            hulls.append(coords)
+            hulls_polygons.append(hull)
 
     # Visualise convex-hulls -> to obj file
     hulls_vertices = []
     hulls_faces = []
     id_p = 0
-    for hexs in hexagons:
+    for hull in hulls:
         face_ = []
-        for vertex in hexs:
+        for vertex in hull:
             v = [vertex[0], vertex[1], 10]
             hulls_vertices.append(v)
             face_.append(id_p)
@@ -450,14 +459,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         # # print("Roof area in 3D: ", area_3d)
 
         # Write files to geoJSON
-        for hexs in hexagons:
-            polygon = []
-            for vertex in hexs:
-                v = Point([vertex[0], vertex[1]])
-                polygon.append(v)
-            v_last = Point([hexs[0][0], hexs[0][1]])
-            polygon.append(v_last)
-            p = Polygon([polygon])
+        for p in hulls_polygons:
             building_id = get_buildingID(input_json, building_nb - 1)
             features.append(Feature(geometry=p, properties={"CityObject": str(building_id),
                                                             "Relative height": str(rel_height),
