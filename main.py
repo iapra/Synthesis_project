@@ -4,7 +4,7 @@ import os
 from plyfile import PlyData, PlyElement
 import numpy as np
 import pandas as pd
-import pywavefront
+# import pywavefront
 import json
 # -- *all* code goes into 'roof_obstacles'
 import roof_obstacles
@@ -104,6 +104,7 @@ def main():
     #         points.append(one_list)
     #
     # roof_obstacles.write_ply(points, './fileout/points_normal_test_rad7.ply')
+    # roof_obstacles.dissolve_geojson('./fileout/output_extractextract1_n_rad7.geojson')
 
 
 if __name__ == '__main__':

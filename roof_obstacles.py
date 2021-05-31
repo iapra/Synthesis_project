@@ -21,8 +21,8 @@ import json
 import os
 import sys
 import shutil
-import alphashape
-
+# import alphashape
+import geopandas as gpd
 
 # -- to speed up the nearest neighbour us a kd-tree
 # https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html#scipy.spatial.KDTree
@@ -262,6 +262,12 @@ def write_txt_cluster(dict_obstacles, obstacle_pts, fileout):
             count += 1
         f.close()
 
+def dissolve_geojson(geojson):
+    data = gpd.read_file(geojson)
+    data_columns = data[['CityObject', 'geometry']]
+    dissolved = data_columns.dissolve(by='CityObject')
+    dissolved.to_file("./fileout/dissolved.geojson", driver='GeoJSON')
+
 
 def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     extract_nb = "extract1_n_rad7"  # variable to name properly the output files
@@ -358,19 +364,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             if tuple(p) not in point_set:
                 point_set.append(tuple(p))
 
-
-        # for obs in point_set:
-        #     x = obs[0]
-        #     y = obs[1]
-        #     one_hexagon = []
-        #     # one_hexagon.append(obs)
-        #     one_hexagon.append((x + 0.2, y))
-        #     one_hexagon.append((x + 0.1, y + 0.2))
-        #     one_hexagon.append((x - 0.1, y + 0.2))
-        #     one_hexagon.append((x - 0.2, y))
-        #     one_hexagon.append((x - 0.1, y - 0.2))
-        #     one_hexagon.append((x + 0.1, y - 0.2))
-        #     hexagons.append(one_hexagon)
 
         for obs in point_set:
             x = obs[0]
@@ -616,7 +609,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
     # Store new attribute per building
     # write_txt_cluster(dict_obstacles_total, obstacle_pts_total, "./fileout/clusters.txt")
-    # write_ply(obstacle_pts_total, './fileout/points_obtacle.ply')
+    write_ply(obstacle_pts_total, './fileout/points_obtacle.ply')
     # write_json(input_json, "./fileout/extract_out.json", dict_buildings)
     # print (dict_buildings)
 
