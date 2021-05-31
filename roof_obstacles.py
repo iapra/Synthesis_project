@@ -2,19 +2,11 @@
 
 import math
 import numpy as np
-#from numpy.core.einsumfunc import _parse_possible_contraction
-#import pandas as pd
-#from numpy.lib.function_base import corrcoef
 import scipy.spatial
 from plyfile import PlyData, PlyElement
 from collections import UserString, deque
 from numpy import unique, where
 from sklearn.datasets import make_classification
-#from sklearn.cluster import Birch
-#from sklearn.cluster import KMeans
-#from matplotlib import pyplot as plt
-#import seaborn as sns
-# from sklearn.datasets.samples_generator import make_blobs
 from geojson import Point, Polygon, Feature, FeatureCollection, dump
 import json
 import os
@@ -24,12 +16,6 @@ import shutil
 from shapely.geometry import Polygon
 from shapely.ops import cascaded_union
 #import geopandas as gpd
-
-# -- to speed up the nearest neighbour us a kd-tree
-# https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html#scipy.spatial.KDTree
-# https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.query.html#scipy.spatial.KDTree.query
-# kd = scipy.spatial.KDTree(list_pts)
-# d, i = kd.query(p, k=1)
 
 def write_json(in_file, outfile, dict):
     # We first copy the input file
@@ -266,144 +252,7 @@ def write_txt_cluster(dict_obstacles, obstacle_pts, fileout):
 #     dissolved = data_columns.dissolve(by='CityObject')
 #     dissolved.to_file("./fileout/dissolved.geojson", driver='GeoJSON')
 
-
-def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
-    extract_nb = "extract1_n_rad7"  # variable to name properly the output files
-
-    print("Number of vertices: ", len(vertices))
-    print("Number of buildings: ", len(faces))
-
-    obstacle_pts_total = []
-    #tops_total = []
-    hulls = []
-    hulls_polygons = []
-    features = []
-    #hexagons = []
-
-    # ROOF EXPORT IN OBJ FOR VISUALISATION: Check that faces are only roofs and LOD2
-    write_obj(vertices, faces, './fileout/roofs_out.obj')
-
-    # OBSTACLE EXTRACTION
-    set_point = set()
-    building_nb = 1
-    projected_area_2d = 0.00
-    area_3d = 0.00
-    for building in faces:
-        stack_first = deque()
-        obstacle_pts = []
-        rel_height = 0
-        max_height = 0
-        max_point = []
-        min_point = []
-        for triangle in building:
-            subset = []
-            assert (len(triangle) == 3)
-            p1 = vertices[triangle[0]]
-            p2 = vertices[triangle[1]]
-            p3 = vertices[triangle[2]]
-            projected_area_2d += area_2d(p1, p2, p3)
-            area_3d += area_polygon_3d([p1, p2, p3])
-
-            id_point = 0
-            for point in point_cloud:
-                if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point) and get_normal(point) < 50 and id_point not in set_point:
-                    set_point.add(id_point)
-                    subset.append(point)
-                id_point += 1
-
-            # Triangle is vertical?
-            if len(subset) == 0:
-                continue
-
-            # Distance points to surface: discard points closer than threshold to define
-            else:
-                threshold = 0.4
-                for p in subset:
-                    dist = shortest_distance(p, plane_equation(p1, p2, p3))
-                    if dist > threshold:
-                        if len(max_point) == 0: max_point.append(p)
-                        if len(min_point) == 0: min_point.append(p)
-                        obstacle_pts.append(p)
-                        stack_first.append(p)
-                        #obstacle_pts_total.append(p)
-                        rel_height += dist
-                        if p[2] > max_point[-1][2]:
-                            max_height = dist
-                            max_point.append(point)
-                        if p[2] < min_point[-1][2]:
-                            min_point.append(point)
-                    else:
-                        continue
-
-        # We add neighbours having similar normal
-        print("length obstacles: ", len(obstacle_pts))
-        kd_total = scipy.spatial.KDTree(point_cloud[:, 0:3])
-
-        while (len(stack_first) > 0):
-            current_p = stack_first[-1]
-            stack_first.pop()
-            n1 = get_normal(current_p)
-            _subset_id = kd_total.query_ball_point(current_p[0:3], r=1)
-            for subset_point_id in _subset_id:
-                n2 = get_normal(point_cloud[subset_point_id])
-                if n2 >= 0.99 * n1 and n2 <= 1.01 * n1 and subset_point_id not in set_point:
-                    set_point.add(subset_point_id)
-                    obstacle_pts.append(point_cloud[subset_point_id])
-                    #obstacle_pts_total.append(point_cloud[subset_point_id])
-                    stack_first.append(point_cloud[subset_point_id])
-                else: continue
-        print("length obstacles then: ", len(obstacle_pts))
-
-        # CLEAN OBSTACLE POINTS
-        obstacle_pts_ = []
-        obstacle_pts_final = []
-        obstacle_pts_final2d = []
-        for _point_ in obstacle_pts:
-            # Radius search
-            query1 = kd_total.query_ball_point(_point_[0:3], r=1)
-            count_higher = 0 
-            for id_p in query1:
-                if point_cloud[id_p][2] > (_point_[2] + 0.1):
-                    count_higher += 1
-            if count_higher < 2:
-                obstacle_pts_.append(_point_)
-        
-        # We ge rid of isolated points
-        if len(obstacle_pts_) < 2: continue
-        else:
-            kd_first = scipy.spatial.KDTree(extract_xyz(obstacle_pts_))
-            for _point_2 in obstacle_pts_:
-                query2 = kd_first.query_ball_point(_point_2[0:3], r=1)
-                if(len(query2)) > 2:
-                    # normal rate change parameter: and _point_2[-1] > 0.02
-                    obstacle_pts_final.append(_point_2)
-                    obstacle_pts_final2d.append(_point_2[0:2])
-                    obstacle_pts_total.append(_point_2)
-            
-        rel_height /= len(obstacle_pts)
-
-        hexagons = []
-        for obs in obstacle_pts_final2d:
-            x = obs[0]
-            y = obs[1]
-            param = 0.15
-            one_hexagon = Polygon([(x+2*param, y), (x+param, y+2*param), (x-param, y+2*param), 
-                                    (x-2*param, y), (x-param, y-2*param), (x+param, y-2*param)])
-            hexagons.append(one_hexagon)
-        hull = cascaded_union(hexagons)
-        try:  
-            # Multipolygon case
-            for poly_id in range(len(hull)):
-                coords = list(hull[poly_id].exterior.coords)
-                hulls.append(coords)
-                hulls_polygons.append(hull[poly_id])
-        except:
-            # Polygon case
-            coords = list(hull.exterior.coords)
-            hulls.append(coords)
-            hulls_polygons.append(hull)
-
-    # Visualise convex-hulls -> to obj file
+def write_obstacles_to_obj(hulls):
     hulls_vertices = []
     hulls_faces = []
     id_p = 0
@@ -437,9 +286,147 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             file.write("\n")
         file.close()
 
+def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
+    extract_nb = "extract1_n_rad7"  # variable to name properly the output files
+
+    print("Number of vertices: ", len(vertices))
+    print("Number of buildings: ", len(faces))
+
+    obstacle_pts_total = []
+    hulls = []
+    hulls_polygons = []
+    features = []
+
+    # 1 -- ROOF EXPORT IN OBJ FOR VISUALISATION: Check that faces are only roofs and LOD2
+    write_obj(vertices, faces, './fileout/roofs_out.obj')
+
+    # 2 -- OBSTACLE POINTS EXTRACTION
+    set_point = set()
+    building_nb = 1
+    projected_area_2d = 0.00
+    area_3d = 0.00
+    for building in faces:
+        stack_first = deque()
+        obstacle_pts = []
+        rel_height = 0
+        max_height = 0
+        max_point = []
+        min_point = []
+        for triangle in building:
+            subset = []
+            assert (len(triangle) == 3)
+            p1 = vertices[triangle[0]]
+            p2 = vertices[triangle[1]]
+            p3 = vertices[triangle[2]]
+            projected_area_2d += area_2d(p1, p2, p3)
+            area_3d += area_polygon_3d([p1, p2, p3])
+
+            id_point = 0
+            for point in point_cloud:
+                if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point) and get_normal(point) < 50 and id_point not in set_point:
+                    set_point.add(id_point)
+                    subset.append(point)
+                id_point += 1
+
+            # No points above this triangle
+            if len(subset) == 0:
+                continue
+
+            # Distance points to surface: discard points closer than threshold to define
+            else:
+                threshold = 0.4
+                for p in subset:
+                    dist = shortest_distance(p, plane_equation(p1, p2, p3))
+                    if dist > threshold:
+                        if len(max_point) == 0: max_point.append(p)
+                        if len(min_point) == 0: min_point.append(p)
+                        obstacle_pts.append(p)
+                        stack_first.append(p)
+                        #obstacle_pts_total.append(p)
+                        rel_height += dist
+                        if p[2] > max_point[-1][2]:
+                            max_height = dist
+                            max_point.append(point)
+                        if p[2] < min_point[-1][2]:
+                            min_point.append(point)
+                    else:
+                        continue
+
+        # We add neighbours having similar normal
+        kd_total = scipy.spatial.KDTree(point_cloud[:, 0:3])
+
+        while (len(stack_first) > 0):
+            current_p = stack_first[-1]
+            stack_first.pop()
+            n1 = get_normal(current_p)
+            _subset_id = kd_total.query_ball_point(current_p[0:3], r=1)
+            for subset_point_id in _subset_id:
+                n2 = get_normal(point_cloud[subset_point_id])
+                if n2 >= 0.99 * n1 and n2 <= 1.01 * n1 and subset_point_id not in set_point:
+                    set_point.add(subset_point_id)
+                    obstacle_pts.append(point_cloud[subset_point_id])
+                    #obstacle_pts_total.append(point_cloud[subset_point_id])
+                    stack_first.append(point_cloud[subset_point_id])
+                else: continue
+        print("length obstacles points: ", len(obstacle_pts))
+
+        # 3 -- CLEAN OBSTACLE POINTS
+        obstacle_pts_ = []
+        obstacle_pts_final = []
+        obstacle_pts_final2d = []
+        for _point_ in obstacle_pts:
+            # Radius search
+            query1 = kd_total.query_ball_point(_point_[0:3], r=1)
+            count_higher = 0 
+            for id_p in query1:
+                if point_cloud[id_p][2] > (_point_[2] + 0.1):
+                    count_higher += 1
+            if count_higher < 2:
+                obstacle_pts_.append(_point_)
+        
+        # We ge rid of isolated points
+        if len(obstacle_pts_) < 2: continue
+        else:
+            kd_first = scipy.spatial.KDTree(extract_xyz(obstacle_pts_))
+            for _point_2 in obstacle_pts_:
+                query2 = kd_first.query_ball_point(_point_2[0:3], r=1)
+                if(len(query2)) > 2:
+                    # normal rate change parameter: and _point_2[-1] > 0.02
+                    obstacle_pts_final.append(_point_2)
+                    obstacle_pts_final2d.append(_point_2[0:2])
+                    obstacle_pts_total.append(_point_2)
+            
+        rel_height /= len(obstacle_pts)
+
+        # 4 -- OBSTACLE POINTS ARE OFFSET AS HEXAGONS AND MERGED IF OVERLAPPING
+        hexagons = []
+        for obs in obstacle_pts_final2d:
+            x = obs[0]
+            y = obs[1]
+            param = 0.15
+            one_hexagon = Polygon([(x+2*param, y), (x+param, y+2*param), (x-param, y+2*param), 
+                                    (x-2*param, y), (x-param, y-2*param), (x+param, y-2*param)])
+            hexagons.append(one_hexagon)
+        # We merge the hegaxons
+        hull = cascaded_union(hexagons)
+
+        # TODO 5 -- CONVEX-HULL OF THE MERGED HEXAGONS
+        try:  
+            # Multipolygon case
+            for poly_id in range(len(hull)):
+                coords = list(hull[poly_id].exterior.coords)
+                hulls.append(coords)
+                hulls_polygons.append(hull[poly_id])
+        except:
+            # Polygon case
+            coords = list(hull.exterior.coords)
+            hulls.append(coords)
+            hulls_polygons.append(hull)
+
         # Check and visualise clusters
         # write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")
 
+        # TODO 5 -- AREA COMPUTATION 2D (AND 3D)
         # # Area calculation of hulls
         # obstacle_area = 0
         # for hull in hulls:
@@ -458,7 +445,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         # # print("Projected roof area in 2D: ", projected_area_2d)
         # # print("Roof area in 3D: ", area_3d)
 
-        # Write files to geoJSON
+        # 6 -- WRITE FILES TO GEOJSON (AND OTHERS)
         for p in hulls_polygons:
             building_id = get_buildingID(input_json, building_nb - 1)
             features.append(Feature(geometry=p, properties={"CityObject": str(building_id),
@@ -479,11 +466,12 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     with open(str('./fileout/output_extract' + str(extract_nb) + '.geojson'), 'w') as geojson:
         dump(feature_collection, geojson)
 
+    # Visualise convex-hulls -> to obj file
+    write_obstacles_to_obj(hulls)
+    
     # Store new attribute per building
     # write_txt_cluster(dict_obstacles_total, obstacle_pts_total, "./fileout/clusters.txt")
     write_ply(obstacle_pts_total, './fileout/points_obtacle.ply')
-    # write_json(input_json, "./fileout/extract_out.json", dict_buildings)
-    # print (dict_buildings)
 
     # print("area 3D = ", area_3d)
     # print("area 2D = ", projected_area_2d)

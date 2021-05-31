@@ -1,7 +1,5 @@
-import sys
 import json
-import os
-from plyfile import PlyData, PlyElement
+from plyfile import PlyData
 import numpy as np
 import pandas as pd
 # import pywavefront
@@ -9,13 +7,13 @@ import json
 # -- *all* code goes into 'roof_obstacles'
 import roof_obstacles
 
-input_ply = "./data/extract2_n_rad7.ply"
-#input_ply = "./data/one_building.ply"
+
+input_ply = "./data/extract3_n_rad7.ply"
 input_obj = "./data/3d_one_building.obj"
 output_file = "./data/out.json"
-input_json = "./data/extract2.json"
+input_json = "./data/extract3.json"
 
-# Structures to get the input elements:
+# -- Structures to get the input elements:
 vertices = []
 faces = []
 json_boundaries = []
@@ -46,7 +44,8 @@ def read_obj(in_file):
 
 def read_json(in_file):
     f = open(in_file)
-    data = json.load(f)   # returns JSON object as a dictionary
+    # loading json returns JSON object as a dictionary
+    data = json.load(f)   
     f.close()
 
     for i in data["CityObjects"]:
@@ -75,9 +74,9 @@ def main():
     data_pd = pd.DataFrame(data)                            # Convert to DataFrame, because DataFrame can parse structured data
 
     # THIS KEEPS ALL PROPERTIES (nb of returns, etc)
-    point_cloud = np.zeros(data_pd.shape, dtype=np.float64)   # Initialize the array of stored data
-    property_names = data[0].dtype.names                # read the name of the property
-    for i, name in enumerate(property_names):           # Read data according to property, so as to ensure that the data read is the same data type.
+    point_cloud = np.zeros(data_pd.shape, dtype=np.float64)     # Initialize the array of stored data
+    property_names = data[0].dtype.names                        # read the name of the property
+    for i, name in enumerate(property_names):                   # Read data according to property, so as to ensure that the data read is the same data type.
         point_cloud[:, i] = data_pd[name]
 
     # THIS KEEPS ONLY x,y,z
@@ -87,24 +86,11 @@ def main():
         if (i > 2): continue
         data_np[:, i] = data_pd[name]
 
-    # -- READ OBJ: store the input in arrays
-    #read_obj(input_obj)
+    # -- READ JSON: store the input in arrays
     read_json(input_json)
 
     # -- detect obstacles
-    #roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file)
-    # roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
     roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
-
-    # to check if normal_check function works
-    # points = []
-    # for point in data_np:
-    #     if roof_obstacles.normal_check(point):
-    #         one_list = [point[0], point[1], point[2]]
-    #         points.append(one_list)
-    #
-    # roof_obstacles.write_ply(points, './fileout/points_normal_test_rad7.ply')
-    # roof_obstacles.dissolve_geojson('./fileout/output_extractextract1_n_rad7.geojson')
 
 
 if __name__ == '__main__':
