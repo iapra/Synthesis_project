@@ -294,7 +294,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
     obstacle_pts_total = []
     hulls = []
-    hulls_polygons = []
     features = []
 
     # 1 -- ROOF EXPORT IN OBJ FOR VISUALISATION: Check that faces are only roofs and LOD2
@@ -306,6 +305,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     projected_area_2d = 0.00
     area_3d = 0.00
     for building in faces:
+        hulls_polygons = []
         stack_first = deque()
         obstacle_pts = []
         rel_height = 0
@@ -399,8 +399,13 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         rel_height /= len(obstacle_pts)
 
         # 4 -- OBSTACLE POINTS ARE OFFSET AS HEXAGONS AND MERGED IF OVERLAPPING
+        point_set = []
+        for p in obstacle_pts_final2d:
+            if tuple(p) not in point_set:
+                point_set.append(tuple(p))
+
         hexagons = []
-        for obs in obstacle_pts_final2d:
+        for obs in point_set:
             x = obs[0]
             y = obs[1]
             param = 0.15
@@ -422,6 +427,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             conv_hull = hull.convex_hull
             hulls.append(conv_hull.exterior.coords)
             hulls_polygons.append(conv_hull)
+
 
         # Check and visualise clusters
         # write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")
