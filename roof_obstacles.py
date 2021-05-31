@@ -1,20 +1,19 @@
 # SYNTHESIS PROJECT.2021
 
 import math
-from geojson.geometry import MultiPolygon
 import numpy as np
-from numpy.core.einsumfunc import _parse_possible_contraction
-import pandas as pd
-from numpy.lib.function_base import corrcoef
+#from numpy.core.einsumfunc import _parse_possible_contraction
+#import pandas as pd
+#from numpy.lib.function_base import corrcoef
 import scipy.spatial
 from plyfile import PlyData, PlyElement
 from collections import UserString, deque
 from numpy import unique, where
 from sklearn.datasets import make_classification
-from sklearn.cluster import Birch
-from sklearn.cluster import KMeans
-from matplotlib import pyplot as plt
-import seaborn as sns
+#from sklearn.cluster import Birch
+#from sklearn.cluster import KMeans
+#from matplotlib import pyplot as plt
+#import seaborn as sns
 # from sklearn.datasets.samples_generator import make_blobs
 from geojson import Point, Polygon, Feature, FeatureCollection, dump
 import json
@@ -22,7 +21,7 @@ import os
 import sys
 import shutil
 # import alphashape
-import geopandas as gpd
+#import geopandas as gpd
 
 # -- to speed up the nearest neighbour us a kd-tree
 # https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.KDTree.html#scipy.spatial.KDTree
@@ -164,24 +163,21 @@ def get_height_difference(vertices):
     height_diff = max(z) - min(z)
     return height_diff
 
-
-def normal_check(in_point):
+def get_normal(point):
     z1 = 0
     z2 = 0
     z3 = 1
-    nx = in_point[3]
-    ny = in_point[4]
-    nz = in_point[5]
-
+    nx = point[3]
+    ny = point[4]
+    nz = point[5]
     # angle between two vectors in radians
     angle = np.arccos([((z1 * nx) + (z2 * ny) + (z3 * nz))
-                       / (math.sqrt((z1 * z1) + (z2 * z2) + (z3 * z3)) * math.sqrt((nx * nx) + (ny * ny) + (nz * nz)))])
+                       / (math.sqrt((z1 * z1) + (z2 * z2) + (z3 * z3)) 
+                       * math.sqrt((nx * nx) + (ny * ny) + (nz * nz)))])
+    return (math.degrees(angle))   
 
-    if 50 < math.degrees(angle):  # this can be changed
-        return False
-    else:
-        return True
-
+def extract_xyz(list):
+    return [item[0:3] for item in list]
 
 def get_slope(p1, p2):
     # print(p1)
@@ -292,6 +288,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     projected_area_2d = 0.00
     area_3d = 0.00
     for building in faces:
+        stack_first = deque()
         obstacle_pts = []
         rel_height = 0
         max_height = 0
@@ -308,8 +305,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
             id_point = 0
             for point in point_cloud:
-                if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point) and normal_check(
-                        point) and id_point not in set_point:
+                if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point) and get_normal(point) < 50 and id_point not in set_point:
                     set_point.add(id_point)
                     subset.append(point)
                 id_point += 1
@@ -327,7 +323,8 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                         if len(max_point) == 0: max_point.append(p)
                         if len(min_point) == 0: min_point.append(p)
                         obstacle_pts.append(p)
-                        obstacle_pts_total.append(p)
+                        stack_first.append(p)
+                        #obstacle_pts_total.append(p)
                         rel_height += dist
                         if p[2] > max_point[-1][2]:
                             max_height = dist
@@ -337,39 +334,63 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                     else:
                         continue
 
-        # Clean obstacle points
+        # We add neighbours having similar normal
+        print("length obstacles: ", len(obstacle_pts))
+        kd_total = scipy.spatial.KDTree(point_cloud[:, 0:3])
+
+        while (len(stack_first) > 0):
+            current_p = stack_first[-1]
+            stack_first.pop()
+            n1 = get_normal(current_p)
+            _subset_id = kd_total.query_ball_point(current_p[0:3], r=1)
+            for subset_point_id in _subset_id:
+                n2 = get_normal(point_cloud[subset_point_id])
+                if n2 >= 0.99 * n1 and n2 <= 1.01 * n1 and subset_point_id not in set_point:
+                    set_point.add(subset_point_id)
+                    obstacle_pts.append(point_cloud[subset_point_id])
+                    #obstacle_pts_total.append(point_cloud[subset_point_id])
+                    stack_first.append(point_cloud[subset_point_id])
+                else: continue
+        print("length obstacles then: ", len(obstacle_pts))
+
+        # CLEAN OBSTACLE POINTS
+        obstacle_pts_ = []
         obstacle_pts_final = []
         obstacle_pts_final2d = []
-        try:
-            kd_first = scipy.spatial.KDTree(obstacle_pts)
-        except:
-            continue
-
-        for point_ in obstacle_pts:
-            # Nearest neighbour search
-            _dist, _id = kd_first.query(point_, k=2)
-            if _dist[1] < 0.8:
-                obstacle_pts_final.append(point_)
-                obstacle_pts_final2d.append(point_[0:2])
-            else:
-                continue
-        # print(len(obstacle_pts))
-        # print(len(obstacle_pts_final))
-        if len(obstacle_pts_final) < 2: continue
-        if len(obstacle_pts_final2d) < 2: continue
+        for _point_ in obstacle_pts:
+            # Radius search
+            query1 = kd_total.query_ball_point(_point_[0:3], r=1)
+            count_higher = 0 
+            for id_p in query1:
+                if point_cloud[id_p][2] > (_point_[2] + 0.1):
+                    count_higher += 1
+            if count_higher < 2:
+                obstacle_pts_.append(_point_)
+        
+        # We ge rid of isolated points
+        if len(obstacle_pts_) < 2: continue
+        else:
+            kd_first = scipy.spatial.KDTree(extract_xyz(obstacle_pts_))
+            for _point_2 in obstacle_pts_:
+                query2 = kd_first.query_ball_point(_point_2[0:3], r=1)
+                if(len(query2)) > 2:
+                    # normal rate change parameter: and _point_2[-1] > 0.02
+                    obstacle_pts_final.append(_point_2)
+                    obstacle_pts_final2d.append(_point_2[0:2])
+                    obstacle_pts_total.append(_point_2)
+            
         rel_height /= len(obstacle_pts)
 
-        point_set = []
-        for p in obstacle_pts_final2d:
-            if tuple(p) not in point_set:
-                point_set.append(tuple(p))
+        # point_set = []
+        # for p in obstacle_pts_final2d:
+        #     if tuple(p) not in point_set:
+        #         point_set.append(tuple(p))
 
 
-        for obs in point_set:
+        for obs in obstacle_pts_final2d:
             x = obs[0]
             y = obs[1]
             one_hexagon = []
-            # one_hexagon.append(obs)
             one_hexagon.append((x + 0.3, y))
             one_hexagon.append((x + 0.15, y + 0.3))
             one_hexagon.append((x - 0.15, y + 0.3))
@@ -411,8 +432,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                 i += 1
             file.write("\n")
         file.close()
-
-
 
         # Check and visualise clusters
         # write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")
@@ -570,7 +589,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     }
     feature_collection = FeatureCollection(features, crs=crs)
     with open(str('./fileout/output_extract' + str(extract_nb) + '.geojson'), 'w') as geojson:
-
         dump(feature_collection, geojson)
 
     # # Visualise convex-hulls -> to obj file
