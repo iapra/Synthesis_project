@@ -246,11 +246,6 @@ def write_txt_cluster(dict_obstacles, obstacle_pts, fileout):
             count += 1
         f.close()
 
-# def dissolve_geojson(geojson):
-#     data = gpd.read_file(geojson)
-#     data_columns = data[['CityObject', 'geometry']]
-#     dissolved = data_columns.dissolve(by='CityObject')
-#     dissolved.to_file("./fileout/dissolved.geojson", driver='GeoJSON')
 
 def write_obstacles_to_obj(hulls):
     hulls_vertices = []
@@ -292,6 +287,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     print("Number of vertices: ", len(vertices))
     print("Number of buildings: ", len(faces))
 
+    dict_buildings = {}
     obstacle_pts_total = []
     hulls = []
     features = []
@@ -312,6 +308,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         max_height = 0
         max_point = []
         min_point = []
+        point_height_dict = 0
         for triangle in building:
             subset = []
             assert (len(triangle) == 3)
@@ -342,8 +339,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                         if len(min_point) == 0: min_point.append(p)
                         obstacle_pts.append(p)
                         stack_first.append(p)
-                        #obstacle_pts_total.append(p)
-                        rel_height += dist
+                        #rel_height += dist
                         if p[2] > max_point[-1][2]:
                             max_height = dist
                             max_point.append(point)
@@ -351,7 +347,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                             min_point.append(point)
                     else:
                         continue
-
+        
         # We add neighbours having similar normal
         kd_total = scipy.spatial.KDTree(point_cloud[:, 0:3])
 
@@ -365,10 +361,9 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                 if n2 >= 0.99 * n1 and n2 <= 1.01 * n1 and subset_point_id not in set_point:
                     set_point.add(subset_point_id)
                     obstacle_pts.append(point_cloud[subset_point_id])
-                    #obstacle_pts_total.append(point_cloud[subset_point_id])
                     stack_first.append(point_cloud[subset_point_id])
                 else: continue
-        print("length obstacles points: ", len(obstacle_pts))
+        #print("length obstacles points: ", len(obstacle_pts))
 
         # 3 -- CLEAN OBSTACLE POINTS
         obstacle_pts_ = []
@@ -395,17 +390,13 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                     obstacle_pts_final.append(_point_2)
                     obstacle_pts_final2d.append(_point_2[0:2])
                     obstacle_pts_total.append(_point_2)
-            
+
+        # TODO - Compute relative_height
         rel_height /= len(obstacle_pts)
-
+        
         # 4 -- OBSTACLE POINTS ARE OFFSET AS HEXAGONS AND MERGED IF OVERLAPPING
-        point_set = []
-        for p in obstacle_pts_final2d:
-            if tuple(p) not in point_set:
-                point_set.append(tuple(p))
-
         hexagons = []
-        for obs in point_set:
+        for obs in obstacle_pts_final2d:
             x = obs[0]
             y = obs[1]
             param = 0.15
@@ -428,32 +419,27 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             hulls.append(conv_hull.exterior.coords)
             hulls_polygons.append(conv_hull)
 
-
         # Check and visualise clusters
         # write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")
 
-        # TODO 5 -- AREA COMPUTATION 2D (AND 3D)
-        # # Area calculation of hulls
-        # obstacle_area = 0
-        # for hull in hulls:
-        #     a = area_polygon_3d(hull)
-        #     obstacle_area += a
+        # 5 -- OBSTACLE AREA COMPUTATION 2D
+        obstacle_area = 0
+        for polygon in hulls_polygons:
+            obstacle_area += polygon.area
 
-        # # Solar potential area computation
-        # # For now we do an ugly cross proportional cross product!
-        # obst_3d = (obstacle_area * area_3d) / projected_area_2d
-        # new_attribute_area3d = area_3d - obst_3d
-        # new_attribute_percent = (new_attribute_area3d / area_3d) *100
-        # #print("Area free for solar panels (m**2) ! ", new_attribute_area3d, " (over ", area_3d, " in total)")
-        # #print("In percentage, this is ", new_attribute_percent, " % ", "of the roof surface")
-        #
-        # dict_buildings[str(building_nb)] = new_attribute_percent /100
-        # # print("Projected roof area in 2D: ", projected_area_2d)
-        # # print("Roof area in 3D: ", area_3d)
+        # Solar potential area computation
+        # Proportional cross product to pass from 2d to 3d (instead of projecting back in 3d)
+        obst_3d = (obstacle_area * area_3d) / projected_area_2d
+        new_attribute_area3d = area_3d - obst_3d
+        new_attribute_percent = (new_attribute_area3d / area_3d) *100
+        #print("Area free for solar panels (m**2) ! ", new_attribute_area3d, " (over ", area_3d, " in total)")
+        #print("In percentage, this is ", new_attribute_percent, " % ", "of the roof surface")
+        
+        building_id = get_buildingID(input_json, building_nb - 1)
+        dict_buildings[building_id] = new_attribute_area3d
 
         # 6 -- WRITE FILES TO GEOJSON (AND OTHERS)
         for p in hulls_polygons:
-            building_id = get_buildingID(input_json, building_nb - 1)
             features.append(Feature(geometry=p, properties={"CityObject": str(building_id),
                                                             "Relative height": str(rel_height),
                                                             "Max obstacle height": str(max_height),
@@ -481,6 +467,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
     # print("area 3D = ", area_3d)
     # print("area 2D = ", projected_area_2d)
+    print(dict_buildings)
 
     return
 
