@@ -271,11 +271,9 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     print("Number of vertices: ", len(vertices))
     print("Number of buildings: ", len(faces))
 
-    dict_buildings = {}
-    dict_obstacles_total = {}
     obstacle_pts_total = []
-    tops_total = []
-    hulls = []
+    #tops_total = []
+    #hulls = []
     features = []
     hexagons = []
 
@@ -381,12 +379,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             
         rel_height /= len(obstacle_pts)
 
-        # point_set = []
-        # for p in obstacle_pts_final2d:
-        #     if tuple(p) not in point_set:
-        #         point_set.append(tuple(p))
-
-
         for obs in obstacle_pts_final2d:
             x = obs[0]
             y = obs[1]
@@ -398,6 +390,9 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             one_hexagon.append((x - 0.15, y - 0.3))
             one_hexagon.append((x + 0.15, y - 0.3))
             hexagons.append(one_hexagon)
+
+        # We should merge here: one merge element is one hull, 
+        # so we can keep the following code then
 
     # Visualise convex-hulls -> to obj file
     hulls_vertices = []
@@ -435,115 +430,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
         # Check and visualise clusters
         # write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")
-
-        # # K-means
-        # nb_cluster = round(len(obstacle_pts_final2d)/7)
-        # k_means = KMeans(init='random', n_clusters=3, n_init=10)
-        # k_means.fit(obstacle_pts_final2d)
-        # k_means_labels = k_means.labels_
-        # #print(k_means_labels)
-        #
-        # dict_obstacles = {}
-        # for id in range(len(k_means_labels)):
-        #     dict_obstacles[str(k_means_labels[id])] = list()
-        # count_ = 0
-        # for p in obstacle_pts_final:
-        #     dict_obstacles[str(k_means_labels[count_])].append(count_)
-        #     count_ += 1
-
-        # # Manual clustering
-        # kd = scipy.spatial.KDTree(obstacle_pts_final)
-        # tops_id = set()
-        # tops = []
-        # stack = deque()
-        # stacked_points_id = set()
-        #
-        # pid = 0
-        # for p in obstacle_pts_final:
-        #     stacked_points_id.add(pid)
-        #     stack.append(pid)
-        #     top = pid
-        #     while (len(stack) > 0):
-        #         assert (len(stack) == 1)
-        #         current_id = stack[-1]
-        #         stack.pop()
-        #
-        #         # We get the higher point in the radius search
-        #         higher_id = current_id
-        #         subset_id = kd.query_ball_point(obstacle_pts_final[current_id], r=4)
-        #
-        #         for id in subset_id:
-        #             if obstacle_pts_final[id][2] > obstacle_pts_final[higher_id][2]:
-        #                 higher_id = id
-        #
-        #         if higher_id not in stacked_points_id:
-        #             stack.append(higher_id)
-        #             stacked_points_id.add(higher_id)
-        #         else:
-        #             top = higher_id
-        #     pid += 1
-        #     # We add the top to the top of the obstacles
-        #     if top not in tops_id:
-        #         tops_id.add(top)
-        #         tops.append(obstacle_pts_final[top])
-        #         tops_total.append(obstacle_pts_final[top])
-        #     else:
-        #         continue
-        #
-        # print("Number of obstacle detected for building ", building_nb, ": ", len(tops))
-        #
-        # # KD tree for the tops
-        # kd_tops = scipy.spatial.KDTree(tops)
-        #
-        # # search for each point its closest top-point
-        # dict_obstacles = {}
-        # for id in range(len(tops)):
-        #     dict_obstacles[str(id)] = list()
-        #     id_total = int(id + len(dict_obstacles_total))
-        #     dict_obstacles_total[str(id_total)] = list()
-        # id_ = 0
-        # for p in obstacle_pts_final:
-        #     # Nearest neighbour search
-        #     dist, id = kd_tops.query(p, k=1)
-        #     dict_obstacles[str(id)].append(id_)
-        #     id_ += 1
-        #
-        # # write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")
-        #
-        # # Create np-array of each cluster
-        # clusters_arr = []
-        # for key in dict_obstacles:
-        #     array_point3d = []
-        #     for val in dict_obstacles[key]:
-        #         point_arr = [obstacle_pts_final[val][0], obstacle_pts_final[val][1], obstacle_pts_final[val][2]]
-        #         array_point3d.append(point_arr)
-        #     if len(array_point3d) > 3:  # add condition of number of points in the cluster
-        #         clusters_arr.append(array_point3d)
-        #
-        # # Obstacle points convex-hull
-        # for cluster_ in clusters_arr:
-        #     point_set = []
-        #     cluster = np.array(cluster_)
-        #     for p in cluster:
-        #         if tuple(p[:2]) not in point_set:
-        #             point_set.append(tuple(p[:2]))
-        #
-        #     # fig, ax = plt.subplots()
-        #     # ax.scatter(*zip(*point_set))
-        #     # plt.show()
-        #
-        #     try:
-        #         alpha = alphashape.alphashape(point_set, 1.0)
-        #         # print("done")
-        #         hull_arr = []
-        #         coords = list(alpha.exterior.coords)
-        #         # print(len(coords))
-        #         for vertex in coords:
-        #             # print(vertex)
-        #             hull_arr.append(vertex)
-        #             hulls.append(hull_arr)
-        #     except:
-        #         continue
 
         # # Area calculation of hulls
         # obstacle_area = 0
@@ -590,40 +476,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     feature_collection = FeatureCollection(features, crs=crs)
     with open(str('./fileout/output_extract' + str(extract_nb) + '.geojson'), 'w') as geojson:
         dump(feature_collection, geojson)
-
-    # # Visualise convex-hulls -> to obj file
-    # hulls_vertices = []
-    # hulls_faces = []
-    # id_p = 0
-    # for hull in hulls:
-    #     face_ = []
-    #     for vertex in hull:
-    #         v = [vertex[0], vertex[1],10]
-    #         hulls_vertices.append(v)
-    #         face_.append(id_p)
-    #         id_p += 1
-    #     hulls_faces.append(face_)
-    #
-    # # write file (hulls obj)
-    # with open("./fileout/hulls.obj", "w") as file:
-    #     for v in hulls_vertices:
-    #         file.write("v ")
-    #         file.write(str(v[0]))
-    #         file.write(" ")
-    #         file.write(str(v[1]))
-    #         file.write(" ")
-    #         file.write(str(v[2]))
-    #         file.write("\n")
-    #     file.write("Oo\n")
-    #     for f in hulls_faces:
-    #         i = 0
-    #         file.write("f ")
-    #         while i < len(f):
-    #             file.write(str(f[i]+1))
-    #             file.write(" ")
-    #             i += 1
-    #         file.write("\n")
-    #     file.close()
 
     # Store new attribute per building
     # write_txt_cluster(dict_obstacles_total, obstacle_pts_total, "./fileout/clusters.txt")
