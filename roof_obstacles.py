@@ -410,18 +410,18 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         # We merge the hegaxons
         hull = cascaded_union(hexagons)
 
-        # TODO 5 -- CONVEX-HULL OF THE MERGED HEXAGONS
+        # 5 -- CONVEX-HULL OF THE MERGED HEXAGONS
         try:  
             # Multipolygon case
             for poly_id in range(len(hull)):
-                coords = list(hull[poly_id].exterior.coords)
-                hulls.append(coords)
-                hulls_polygons.append(hull[poly_id])
+                conv_hull = hull[poly_id].convex_hull
+                hulls.append(conv_hull.exterior.coords)
+                hulls_polygons.append(conv_hull)
         except:
             # Polygon case
-            coords = list(hull.exterior.coords)
-            hulls.append(coords)
-            hulls_polygons.append(hull)
+            conv_hull = hull.convex_hull
+            hulls.append(conv_hull.exterior.coords)
+            hulls_polygons.append(conv_hull)
 
         # Check and visualise clusters
         # write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")
