@@ -2,6 +2,7 @@
 
 import math
 import numpy as np
+from statistics import stdev
 import scipy.spatial
 from plyfile import PlyData, PlyElement
 from collections import UserString, deque
@@ -282,7 +283,7 @@ def write_obstacles_to_obj(hulls):
         file.close()
 
 def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
-    extract_nb = "1_n_rad7"  # variable to name properly the output files
+    extract_nb = "2_n_rad7"  # variable to name properly the output files
 
     print("Number of vertices: ", len(vertices))
     print("Number of buildings: ", len(faces))
@@ -301,6 +302,22 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     projected_area_2d = 0.00
     area_3d = 0.00
     max_heights = []
+    
+    all_dist = []
+    for building in faces:
+        for triangle in building:
+            pt1 = vertices[triangle[0]]
+            pt2 = vertices[triangle[1]]
+            pt3 = vertices[triangle[2]]
+            for pt in point_cloud:
+                if isInside(pt1, pt2, pt3, pt) and isAbove(pt1, pt2, pt3, pt) and get_normal(pt) < 50:
+                    dist2 = shortest_distance(pt, plane_equation(pt1, pt2, pt3))
+                    all_dist.append(dist2)
+    # We define the distance threshold to detect point obstacles
+    std = np.std(all_dist)
+    #threshold = 1.5*std
+    threshold = 0.4
+    
     for building in faces:
         hulls_polygons = []
         stack_first = deque()
@@ -330,7 +347,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
             # Distance points to surface: discard points closer than threshold to define
             else:
-                threshold = 0.4
+                #threshold = 0.4
                 for p in subset:
                     dist = shortest_distance(p, plane_equation(p1, p2, p3))
                     if dist > threshold:
@@ -445,7 +462,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         # 6 -- WRITE FILES TO GEOJSON (AND OTHERS)
         for p in hulls_polygons:
             features.append(Feature(geometry=p, properties={"CityObject": str(building_id),
-                                                            "Max obstacle height": str(0)
+                                                            "Max obstacle height": max_heights[-1]
                                                             }))
         building_nb += 1
 
@@ -459,7 +476,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     with open(str('./fileout/output_extract' + str(extract_nb) + '.geojson'), 'w') as geojson:
         dump(feature_collection, geojson)
 
-    print(len(max_heights))
     print(max_heights)
     
     # Visualise convex-hulls -> to obj file
