@@ -130,6 +130,12 @@ def plane_equation(v1, v2, v3):
     equation_coef = [a, b, c, d]
     return equation_coef
 
+def get_3dPoint(plane_eq, point2d):
+    x, y = point2d[0], point2d[1]
+    num = plane_eq[3] - x*plane_eq[0] - y*plane_eq[1]
+    denum = plane_eq[2]
+    p = Point(x,y,(num/denum))
+    return (p)
 
 def shortest_distance(p, equation_coef):
     # Function to find distance from point p to plane
@@ -283,7 +289,7 @@ def write_obstacles_to_obj(hulls):
         file.close()
 
 def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
-    extract_nb = "2_n_rad7"  # variable to name properly the output files
+    extract_nb = "4_n_rad7"  # variable to name properly the output files
 
     print("Number of vertices: ", len(vertices))
     print("Number of buildings: ", len(faces))
@@ -448,6 +454,8 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         for polygon in hulls_polygons:
             obstacle_area += polygon.area
 
+        # 6 -- OBSTACLE AREA COMPUTATION 2D
+
         # Solar potential area computation
         # Proportional cross product to pass from 2d to 3d (instead of projecting back in 3d)
         obst_3d = (obstacle_area * area_3d) / projected_area_2d
@@ -459,7 +467,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         building_id = get_buildingID(input_json, building_nb - 1)
         dict_buildings[building_id] = new_attribute_area3d
 
-        # 6 -- WRITE FILES TO GEOJSON (AND OTHERS)
+        # 7 -- WRITE FILES TO GEOJSON (AND OTHERS)
         for p in hulls_polygons:
             features.append(Feature(geometry=p, properties={"CityObject": str(building_id),
                                                             "Max obstacle height": max_heights[-1]
