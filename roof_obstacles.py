@@ -300,6 +300,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     building_nb = 1
     projected_area_2d = 0.00
     area_3d = 0.00
+    max_heights = []
     for building in faces:
         hulls_polygons = []
         stack_first = deque()
@@ -316,11 +317,11 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
             id_point = 0
             for point in point_cloud:
+                xy = (point[0], point[1])
+                point_toFace_dict[xy] = triangle
                 if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point) and get_normal(point) < 50 and id_point not in set_point:
                     set_point.add(id_point)
                     subset.append(point)
-                    xy = (point[0], point[1])
-                    point_toFace_dict[xy] = triangle
                 id_point += 1
 
             # No points above this triangle
@@ -353,7 +354,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                     obstacle_pts.append(point_cloud[subset_point_id])
                     stack_first.append(point_cloud[subset_point_id])
                 else: continue
-        #print("length obstacles points: ", len(obstacle_pts))
 
         # 3 -- CLEAN OBSTACLE POINTS
         obstacle_pts_ = []
@@ -408,10 +408,24 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             hulls_polygons.append(conv_hull)
 
         # Check and visualise clusters
-        # write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")   
-
-
-
+        # write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")  
+        
+        # Retrieve points_relative height to the 3d model
+        for h in hulls_polygons:
+            id_point2d = 0
+            for point2d in obstacle_pts_final2d:
+                p2d = Point(point2d[0], point2d[1])
+                max_height = 0.00
+                if h.contains(p2d):
+                    tr = point_toFace_dict[(point2d[0], point2d[1])]
+                    v1, v2, v3 = vertices[tr[0]], vertices[tr[1]], vertices[tr[2]]
+                    distance2 = shortest_distance(obstacle_pts_final[id_point2d], plane_equation(v1, v2, v3))
+                    if distance2 > max_height:
+                        max_height = distance2     
+                id_point2d += 1
+            max_heights.append(max_height)
+        
+         
         # 5 -- OBSTACLE AREA COMPUTATION 2D
         obstacle_area = 0
         for polygon in hulls_polygons:
@@ -433,7 +447,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             features.append(Feature(geometry=p, properties={"CityObject": str(building_id),
                                                             "Max obstacle height": str(0)
                                                             }))
-
         building_nb += 1
 
     crs = {
@@ -446,52 +459,9 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     with open(str('./fileout/output_extract' + str(extract_nb) + '.geojson'), 'w') as geojson:
         dump(feature_collection, geojson)
 
-    # Retrieve points_relative height to the 3d model
-    max_heights = []
-    
-    
-    print(len(hulls_polygons))
-    
-    for h in hulls_polygons:
-        id_point2d = 0
-        for point2d in obstacle_pts_final2d:
-            p2d = Point(point2d[0], point2d[1])
-            print(h)
-            if h.geom_type == "Polygon":
-                max_height = 0.00
-                if h.contains(p2d):
-                    tr = point_toFace_dict[(point2d[0], point2d[1])]
-                    v1, v2, v3 = vertices[tr[0]], vertices[tr[1]], vertices[tr[2]]
-                    distance2 = shortest_distance(obstacle_pts_final[id_point2d], plane_equation(v1, v2, v3))
-                    if distance2 > max_height:
-                        max_height = distance2
-        
-
-            elif h.geom_type == 'MultiPolygon':
-                print("multipolygon !!!!!!!")
-                for poly in h:
-                    lst_height =[]
-                    max_height2 = 0.00
-                    if poly.contains(p2d):
-                        tr = point_toFace_dict[(point2d[0], point2d[1])]
-                        v1, v2, v3 = vertices[tr[0]], vertices[tr[1]], vertices[tr[2]]
-                        distance = shortest_distance(obstacle_pts_final[id_point2d], plane_equation(v1, v2, v3))
-                        if distance > max_height2:
-                            max_height2 = distance
-                    lst_height.append(max_height2)
-
-            if h.geom_type == "Polygon":
-                max_heights.append(max_height)
-            if h.geom_type == 'MultiPolygon':
-                max_heights.append(lst_height)
-
-            id_point2d += 1
-
-        
+    print(len(max_heights))
     print(max_heights)
-    print(len(max_heights)) 
-    #print(len(obstacle_pts_final2d))
-
+    
     # Visualise convex-hulls -> to obj file
     write_obstacles_to_obj(hulls)
     
