@@ -282,7 +282,7 @@ def write_obstacles_to_obj(hulls):
         file.close()
 
 def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
-    extract_nb = "extract1_n_rad7"  # variable to name properly the output files
+    extract_nb = "1_n_rad7"  # variable to name properly the output files
 
     print("Number of vertices: ", len(vertices))
     print("Number of buildings: ", len(faces))
@@ -413,9 +413,9 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         # Retrieve points_relative height to the 3d model
         for h in hulls_polygons:
             id_point2d = 0
+            max_height = 0.00
             for point2d in obstacle_pts_final2d:
                 p2d = Point(point2d[0], point2d[1])
-                max_height = 0.00
                 if h.contains(p2d):
                     tr = point_toFace_dict[(point2d[0], point2d[1])]
                     v1, v2, v3 = vertices[tr[0]], vertices[tr[1]], vertices[tr[2]]
