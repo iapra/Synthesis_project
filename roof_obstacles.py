@@ -19,30 +19,27 @@ from shapely.ops import cascaded_union
 #import geopandas as gpd
 
 def write_json(in_file, outfile, dict):
-    # We first copy the input file
-    if not os.path.isfile(in_file):
-        print("Source file does not exist.")
-        sys.exit(3)
-    try:
-        shutil.copy(in_file, outfile)
-    except (IOError):
-        print("Could not copy file.")
-        sys.exit(3)
-    # print(dict)
+    # # We first copy the input file
+    # if not os.path.isfile(in_file):
+    #     print("Source file does not exist.")
+    #     sys.exit(3)
+    # try:
+    #     shutil.copy(in_file, outfile)
+    # except (IOError):
+    #     print("Could not copy file.")
+    #     sys.exit(3)
+    # # print(dict)
 
-    # We edit the copy by adding an attribute
-    with open(outfile, 'r+') as f:
-        data = json.load(f)
-        # d = {"HEY": 2000}
-        # d = {data["CityObjects"]["1891794"]["attributes"]:2000}
-        data["CityObjects"]["1891794"]["attributes"]["HEY "] = 2000
-        # json.dump(d, data["CityObjects"]["1891794"]["attributes"])
-        for i in data["CityObjects"]:  # i id the building id
-            # f.write("HEY ")
-            for attribute_field in data["CityObjects"][i]["attributes"]:
-                print(attribute_field)  # key = attribute name
-                print(data["CityObjects"][i]["attributes"][attribute_field])  # attribute value
-    f.close()
+    inp_file = open(in_file, "r")
+    json_obj = json.load(inp_file)
+    inp_file.close()
+
+    for key in dict:
+        json_obj["CityObjects"][key]["attributes"]["available solar potential area (m^2)"] = dict[key]
+
+    inp_file = open(outfile, "w")
+    json.dump(json_obj, inp_file)
+    inp_file.close()
 
 
 def get_buildingID(json_in, index):
@@ -497,6 +494,8 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     # print("area 2D = ", projected_area_2d)
     print(dict_buildings)
 
+    #write CityJSON
+    write_json(input_json, output_file, dict_buildings)
     return
 
 
