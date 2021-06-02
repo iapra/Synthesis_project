@@ -448,54 +448,49 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
     # Retrieve points_relative height to the 3d model
     max_heights = []
-    id_point2d = 0
     
-    #for point2d in obstacle_pts_final2d:
-
-        #xp = obstacle_pts_final[id_point2d][0]
-        #yp = obstacle_pts_final[id_point2d][1]
-        #xp = point2d[0]
-        
-        #p2d = Point(point2d[0], point2d[1])
-
+    
+    print(len(hulls_polygons))
     
     for h in hulls_polygons:
-        if h.geom_type == "Polygon":
-            for point2d in obstacle_pts_final2d:
-                p2d = Point(point2d[0], point2d[1])
+        id_point2d = 0
+        for point2d in obstacle_pts_final2d:
+            p2d = Point(point2d[0], point2d[1])
+            print(h)
+            if h.geom_type == "Polygon":
                 max_height = 0.00
-                #print(h)
-                #print(p2d)
                 if h.contains(p2d):
-                    #print("true")
-                # else:
-                #     print("false")
                     tr = point_toFace_dict[(point2d[0], point2d[1])]
                     v1, v2, v3 = vertices[tr[0]], vertices[tr[1]], vertices[tr[2]]
                     distance2 = shortest_distance(obstacle_pts_final[id_point2d], plane_equation(v1, v2, v3))
                     if distance2 > max_height:
                         max_height = distance2
+        
+
+            elif h.geom_type == 'MultiPolygon':
+                print("multipolygon !!!!!!!")
+                for poly in h:
+                    lst_height =[]
+                    max_height2 = 0.00
+                    if poly.contains(p2d):
+                        tr = point_toFace_dict[(point2d[0], point2d[1])]
+                        v1, v2, v3 = vertices[tr[0]], vertices[tr[1]], vertices[tr[2]]
+                        distance = shortest_distance(obstacle_pts_final[id_point2d], plane_equation(v1, v2, v3))
+                        if distance > max_height2:
+                            max_height2 = distance
+                    lst_height.append(max_height2)
+
+            if h.geom_type == "Polygon":
                 max_heights.append(max_height)
+            if h.geom_type == 'MultiPolygon':
+                max_heights.append(lst_height)
 
-    if hull.geom_type == 'MultiPolygon':
-        print("multipolygon")
-        for point2d in obstacle_pts_final2d:
-            p2d = Point(point2d[0], point2d[1])
-            for poly in hull:
-                lst_height =[]
-                max_height = 0.00
-                if poly.contains(p2d):
-                    tr = point_toFace_dict[(point2d[0], point2d[1])]
-                    v1, v2, v3 = vertices[tr[0]], vertices[tr[1]], vertices[tr[2]]
-                    distance = shortest_distance(obstacle_pts_final[id_point2d], plane_equation(v1, v2, v3))
-                    if distance > max_height:
-                        max_height = distance
-                lst_height.append(max_height)
-            max_heights.append(lst_height)
+            id_point2d += 1
 
-        #id_point2d += 1
+        
     print(max_heights)
     print(len(max_heights)) 
+    #print(len(obstacle_pts_final2d))
 
     # Visualise convex-hulls -> to obj file
     write_obstacles_to_obj(hulls)
