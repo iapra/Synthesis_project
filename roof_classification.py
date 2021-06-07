@@ -99,6 +99,21 @@ def clusterization(masks,bounds):
 		images.append(im)
 	return images
 
+def save_raster_clusterization(img,buildings,images):
+	with open('./data/translations/translations.json') as f:
+		translations = json.load(f)
+	for r, image in enumerate(images):
+		trans = translations[buildings["identificatie"][r]]
+		transform = from_origin(img[r].transform[2]-trans[0],img[r].transform[5]-trans[1],0.25,0.25)
+		new_array = rasterio.open('./raster_results/'+buildings["identificatie"][r]+'.tif', 
+							'w', driver='GTiff',
+							height = image.shape[0], width = image.shape[1],
+                           	count=1, dtype = str(image[0][0].dtype),
+                          	crs=28992, nodata = 0,
+            		        transform=transform)
+		new_array.write(image,1)
+		new_array.close()
+
 def polygonize_raster(raster,images,ids, bag):
 	for index,r in enumerate(raster):
 		crs = CRS.from_epsg(28992)
@@ -113,7 +128,7 @@ def polygonize_raster(raster,images,ids, bag):
 		gpd_polygonized_raster1['group'] = gpd_polygonized_raster['raster_val']
 		gpd_polygonized_raster1.crs = 28992
 		bag.crs = 28992
-		gpd_polygonized_raster1 = gpd_polygonized_raster1.buffer(0)
+		gpd_polygonized_raster1['geometry'] = gpd_polygonized_raster1.geometry.buffer(0)
 		gpd_polygonized_raster1 = gpd.clip(gpd_polygonized_raster1, bag.iloc[[index]])
 		gpd_polygonized_raster1 = gpd_polygonized_raster1[gpd_polygonized_raster1.geometry.apply(lambda x : x.type!='GeometryCollection' )]
 		gpd_polygonized_raster1.to_file(parth_rest+ ids[index] + '.geojson', driver='GeoJSON', schema=None)
@@ -127,6 +142,7 @@ def main():
     masks = mask_buildings_images(buildings_t, images)
     clusters = clusterization(masks,img_bounds)
     ids = get_ids(bag)
+    save_raster_clusterization(images,bag,clusters)
     polygonize_raster(clusters, images, ids, bag)
 if __name__ == '__main__':
     main()

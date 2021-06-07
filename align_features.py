@@ -48,8 +48,8 @@ def get_big_building(buildings):
     return comlete_shape    
 
 def create_translations(cs, polygons,trans):
-    x = np.linspace(-5,5,41)#41
-    y = np.linspace(-5,5,41)
+    x = np.linspace(-3,3,41)#41
+    y = np.linspace(-3,3,41)
     for i in x:
         for j in y:
             pol = cs.translate(xoff = i, yoff=j)
@@ -88,7 +88,7 @@ def align_by_id(buildings):
         rasters = []
         transform = from_origin(img.bounds[0],img.bounds[3],0.25,0.25)
         for line in lines:
-            raster_bag = rasterio.features.rasterize(line.geometry, out_shape=(w, l), transform=transform, fill = 2)
+            raster_bag = rasterio.features.rasterize(line.geometry.buffer(0.125), out_shape=(w, l), transform=transform, fill = 2)
             rasters.append(raster_bag)
         edges_high_thresh = np.where(edges_high_thresh==255, 1, edges_high_thresh)
         rasters2 = []
@@ -113,7 +113,7 @@ def align_by_id(buildings):
         with open('./data/translations/translations.json', 'w') as json_file:
                 json.dump(trans, json_file)
 def main():
-    read_input('params2.json')
+    read_input('params.json')
 
 if __name__ == '__main__':
     main()
