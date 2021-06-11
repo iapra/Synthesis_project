@@ -69,6 +69,22 @@ def read_json(in_file):
         vtx[1] = (vtx[1] * data["transform"]["scale"][1]) + data["transform"]["translate"][1]
         vtx[2] = (vtx[2] * data["transform"]["scale"][2]) + data["transform"]["translate"][2]
 
+def npy_to_one_ply(all_pc):
+    all_data = []
+    all_files = os.listdir(all_pc)
+    for pc in all_files:
+        data = np.load(all_pc + pc)
+        for each in data:
+            all_data.append(each)
+    roof_obstacles.write_ply(all_data, './fileout/ply_pc/all_bdg.ply')
+
+def npy_to_ply(all_pc):
+    all_files = os.listdir(all_pc)
+    for pc in all_files:
+        data = np.load(all_pc + pc)
+        roof_obstacles.write_ply(data, './fileout/ply_pc/' + str(pc[:16]) + '.ply')
+        print("done")
+
 def main():
     # -- READ PLY: store the input 3D points in np array
     plydata = PlyData.read(input_ply)                       # read file
@@ -92,8 +108,9 @@ def main():
     read_json(input_json)
 
     # -- detect obstacles
+    #npy_to_one_ply(input_pcs)
     roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
-    roof_obstacles.npy_to_one_ply(input_pcs)
+
 
 
 if __name__ == '__main__':

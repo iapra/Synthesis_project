@@ -122,20 +122,12 @@ def plane_equation(v1, v2, v3):
     equation_coef = [a, b, c, d]
     return equation_coef
 
-def get_3dPoint(plane_eq, point2d):
-    x, y = point2d[0], point2d[1]
-    num = plane_eq[3] - x*plane_eq[0] - y*plane_eq[1]
-    denum = plane_eq[2]
-    p = Point(x,y,(num/denum))
-    return (p)
-
 def shortest_distance(p, equation_coef):
     # Function to find distance from point p to plane
     a, b, c, d = equation_coef[0], equation_coef[1], equation_coef[2], -equation_coef[3]
     x, y, z = p[0], p[1], p[2]
     numerator = abs((a * x + b * y + c * z + d))
     denum = (math.sqrt(a * a + b * b + c * c))
-    # print(numerator/denum)
     return numerator / denum
 
 
@@ -143,6 +135,7 @@ def distance_2p(p1, p2):
     math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2 + (p2[2] - p1[1]) ** 2)
 
 
+# --- This can be deleted for final code
 def get_height_difference(vertices):
     z = []
     for vertex in vertices:
@@ -166,16 +159,15 @@ def get_normal(point):
 def extract_xyz(list):
     return [item[0:3] for item in list]
 
+
+# --- This can be deleted for final code
 def get_slope(p1, p2):
-    # print(p1)
-    # print(p2)
     length = math.sqrt((p2[0] - p1[[0]]) ** 2 + (p2[1] - p1[[1]]) ** 2 + (p2[2] - p1[[2]]) ** 2)
     length_2d = math.sqrt((p2[0] - p1[[0]]) ** 2 + (p2[1] - p1[[1]]) ** 2)
     try:
         return math.acos(length_2d / length)
     except:
         return 0
-
 
 def write_obj(vertices, faces, fileout):
     vertices_out = []
@@ -212,12 +204,10 @@ def write_obj(vertices, faces, fileout):
             file.write("\n")
         file.close()
 
-
 def write_ply(obstacle_pts, fileout):
     tuples = []
     for p in obstacle_pts:
         new_p = [p[0], p[1], p[2]]
-        # for obstacle_point in obstacle_arr:
         point = tuple(new_p)
         tuples.append(point)
     a = np.array(tuples, dtype=[('x', 'f8'), ('y', 'f8'), ('z', 'f8')])
@@ -227,7 +217,23 @@ def write_ply(obstacle_pts, fileout):
     with open(fileout, mode='wb') as f:
         PlyData([el], text=True).write(f)
 
+def write_ply_final(point_cloud, dict_points, fileout):
+    tuples = []
+    pid = 0
+    for p in point_cloud:
+        new_p = [p[0], p[1], p[2], dict_points[pid]]
+        point = tuple(new_p)
+        tuples.append(point)
+        pid += 1
+    a = np.array(tuples, dtype=[('x', 'f8'), ('y', 'f8'), ('z', 'f8'), ('distance_to_plane', 'f8')])
+    print("Number of points in PLY file: ", len(point_cloud))
+    # write PLY
+    el = PlyElement.describe(a, 'vertex')
+    with open(fileout, mode='wb') as f:
+        PlyData([el], text=True).write(f)
 
+
+# --- This can be deleted for final code
 def write_txt_cluster(dict_obstacles, obstacle_pts, fileout):
     with open(fileout, "w") as f:
         f.write("x y z obstacle \n")
@@ -245,25 +251,7 @@ def write_txt_cluster(dict_obstacles, obstacle_pts, fileout):
             count += 1
         f.close()
 
-
-def npy_to_ply(all_pc):
-    all_files = os.listdir(all_pc)
-    for pc in all_files:
-        data = np.load(all_pc + pc)
-        write_ply(data, './fileout/ply_pc/' + str(pc[:16]) + '.ply')
-        print("done")
-
-
-def npy_to_one_ply(all_pc):
-    all_data = []
-    all_files = os.listdir(all_pc)
-    for pc in all_files:
-        data = np.load(all_pc + pc)
-        for each in data:
-            all_data.append(each)
-    write_ply(all_data, './fileout/ply_pc/all_bdg.ply')
-
-
+# --- This can be deleted for final code
 def write_obstacles_to_obj(hulls):
     hulls_vertices = []
     hulls_faces = []
@@ -305,6 +293,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     print("Number of buildings: ", len(faces))
 
     dict_buildings = {}
+    dict_points = {}
     obstacle_pts_total = []
     hulls = []
     features = []
@@ -319,6 +308,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     area_3d = 0.00
     max_heights = []
     
+    # --- This can be deleted for final code --- Parameter for threshold not used
     all_dist = []
     for building in faces:
         for triangle in building:
@@ -332,7 +322,8 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     # We define the distance threshold to detect point obstacles
     std = np.std(all_dist)
     #threshold = 1.5*std
-    threshold = 0.4
+
+    # ---- until here
     
     for building in faces:
         hulls_polygons = []
@@ -355,6 +346,9 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                 if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point) and get_normal(point) < 50 and id_point not in set_point:
                     set_point.add(id_point)
                     subset.append(point)
+                    dict_points[id_point] = shortest_distance(point, plane_equation(p1, p2, p3))
+                else: 
+                    dict_points[id_point] = 0
                 id_point += 1
 
             # No points above this triangle
@@ -363,7 +357,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
             # Distance points to surface: discard points closer than threshold to define
             else:
-                #threshold = 0.4
+                threshold = 0.4
                 for p in subset:
                     dist = shortest_distance(p, plane_equation(p1, p2, p3))
                     if dist > threshold:
@@ -502,7 +496,8 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     
     # Store new attribute per building
     # write_txt_cluster(dict_obstacles_total, obstacle_pts_total, "./fileout/clusters.txt")
-    write_ply(obstacle_pts_total, './fileout/points_obtacle.ply')
+    write_ply(obstacle_pts_final, './fileout/points_obtacle.ply')
+    write_ply_final(point_cloud, dict_points, './fileout/point_cloud_final.ply')
 
     # print("area 3D = ", area_3d)
     # print("area 2D = ", projected_area_2d)
