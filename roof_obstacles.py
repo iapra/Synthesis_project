@@ -19,17 +19,6 @@ from shapely.ops import cascaded_union
 #import geopandas as gpd
 
 def write_json(in_file, outfile, dict):
-    # # We first copy the input file
-    # if not os.path.isfile(in_file):
-    #     print("Source file does not exist.")
-    #     sys.exit(3)
-    # try:
-    #     shutil.copy(in_file, outfile)
-    # except (IOError):
-    #     print("Could not copy file.")
-    #     sys.exit(3)
-    # # print(dict)
-
     inp_file = open(in_file, "r")
     json_obj = json.load(inp_file)
     inp_file.close()
@@ -41,12 +30,18 @@ def write_json(in_file, outfile, dict):
     json.dump(json_obj, inp_file)
     inp_file.close()
 
+def get_cityJSON_ID(json_in, index):
+    with open(json_in, 'r') as f:
+        data = json.load(f)
+        building_id = list(data["CityObjects"].keys())[index]
+        return (building_id)
 
 def get_buildingID(json_in, index):
     with open(json_in, 'r') as f:
         data = json.load(f)
         building_id = list(data["CityObjects"].keys())[index]
-        return (building_id)
+        identificatie = data["CityObjects"][building_id]["attributes"]["identificatie"]
+        return (identificatie)
 
 
 def area_2d(p1, p2, p3):
@@ -461,12 +456,13 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         #print("Area free for solar panels (m**2) ! ", new_attribute_area3d, " (over ", area_3d, " in total)")
         #print("In percentage, this is ", new_attribute_percent, " % ", "of the roof surface")
         
-        building_id = get_buildingID(input_json, building_nb - 1)
+        building_id = get_cityJSON_ID(input_json, building_nb - 1)
         dict_buildings[building_id] = new_attribute_area3d
 
         # 7 -- WRITE FILES TO GEOJSON (AND OTHERS)
         for p in hulls_polygons:
             features.append(Feature(geometry=p, properties={"CityObject": str(building_id),
+                                                            "Identificatie": get_buildingID(input_json, building_nb - 1),
                                                             "Max obstacle height": max_heights[-1]
                                                             }))
         building_nb += 1
