@@ -251,6 +251,24 @@ def write_txt_cluster(dict_obstacles, obstacle_pts, fileout):
         f.close()
 
 
+def npy_to_ply(all_pc):
+    all_files = os.listdir(all_pc)
+    for pc in all_files:
+        data = np.load(all_pc + pc)
+        write_ply(data, './fileout/ply_pc/' + str(pc[:16]) + '.ply')
+        print("done")
+
+
+def npy_to_one_ply(all_pc):
+    all_data = []
+    all_files = os.listdir(all_pc)
+    for pc in all_files:
+        data = np.load(all_pc + pc)
+        for each in data:
+            all_data.append(each)
+    write_ply(all_data, './fileout/ply_pc/all_bdg.ply')
+
+
 def write_obstacles_to_obj(hulls):
     hulls_vertices = []
     hulls_faces = []

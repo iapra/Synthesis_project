@@ -6,12 +6,14 @@ import pandas as pd
 import json
 # -- *all* code goes into 'roof_obstacles'
 import roof_obstacles
+import os
 
 
-input_ply = "./data/extract3_n_rad7.ply"
+input_ply = "./data/extract1_n_rad7.ply"
 input_obj = "./data/3d_one_building.obj"
-output_file = "./data/out.json"
-input_json = "./data/extract3.json"
+output_file = "./fileout/out.json"
+input_json = "./data/extract1.json"
+input_pcs = "./data/pointclouds/"
 
 # -- Structures to get the input elements:
 vertices = []
@@ -91,6 +93,7 @@ def main():
 
     # -- detect obstacles
     roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
+    roof_obstacles.npy_to_one_ply(input_pcs)
 
 
 if __name__ == '__main__':
