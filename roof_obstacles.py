@@ -5,7 +5,7 @@ import numpy as np
 from statistics import stdev
 import scipy.spatial
 from plyfile import PlyData, PlyElement
-from collections import deque
+from collections import defaultdict, deque
 from numpy import unique, where
 from sklearn.datasets import make_classification
 from geojson import Point, Polygon, Feature, FeatureCollection, dump
@@ -139,10 +139,7 @@ def get_height_difference(vertices):
     height_diff = max(z) - min(z)
     return height_diff
 
-def get_normal(pc_array, pt_array):
-
-
-def get_normal_orientation(point):
+def get_normal(point):
     z1 = 0
     z2 = 0
     z3 = 1
@@ -292,7 +289,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     print("Number of buildings: ", len(faces))
 
     dict_buildings = {}
-    dict_points = {}
+    dict_points = defaultdict(lambda:0)
     obstacle_pts_total = []
     hulls = []
     features = []
@@ -315,10 +312,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             pt2 = vertices[triangle[1]]
             pt3 = vertices[triangle[2]]
             for pt in point_cloud:
-                # We compute and append the 3 normals values to the point
-                nx, ny, nz = get_normal(pt)
-                pt.append(nx, ny, nz)
-                if isInside(pt1, pt2, pt3, pt) and isAbove(pt1, pt2, pt3, pt) and get_normal_orientation(pt) < 50:
+                if isInside(pt1, pt2, pt3, pt) and isAbove(pt1, pt2, pt3, pt) and get_normal(pt) < 50:
                     dist2 = shortest_distance(pt, plane_equation(pt1, pt2, pt3))
                     all_dist.append(dist2)
     # We define the distance threshold to detect point obstacles
@@ -345,29 +339,20 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             for point in point_cloud:
                 xy = (point[0], point[1])
                 point_toFace_dict[xy] = triangle
-                if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point) and get_normal_orientation
-            (point) < 50 and id_point not in set_point:
+                if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point) and get_normal(point) < 50 and id_point not in set_point:
                     set_point.add(id_point)
                     subset.append(point)
                     dict_points[id_point] = shortest_distance(point, plane_equation(p1, p2, p3))
-                else: 
-                    dict_points[id_point] = 0
                 id_point += 1
 
-            # No points above this triangle
-            if len(subset) == 0:
-                continue
-
             # Distance points to surface: discard points closer than threshold to define
+        threshold = 0.4
+        for pid, p in enumerate(point_cloud):
+            if dict_points[pid] > threshold:
+                obstacle_pts.append(p)
+                stack_first.append(p)
             else:
-                threshold = 0.4
-                for p in subset:
-                    dist = shortest_distance(p, plane_equation(p1, p2, p3))
-                    if dist > threshold:
-                        obstacle_pts.append(p)
-                        stack_first.append(p)
-                    else:
-                        continue
+                continue
         
         # We add neighbours having similar normal's orientation
         kd_total = scipy.spatial.KDTree(point_cloud[:, 0:3])
@@ -375,12 +360,10 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         while (len(stack_first) > 0):
             current_p = stack_first[-1]
             stack_first.pop()
-            n1 = get_normal_orientation
-        (current_p)
+            n1 = get_normal(current_p)
             _subset_id = kd_total.query_ball_point(current_p[0:3], r=1)
             for subset_point_id in _subset_id:
-                n2 = get_normal_orientation
-            (point_cloud[subset_point_id])
+                n2 = get_normal(point_cloud[subset_point_id])
                 if n2 >= 0.99 * n1 and n2 <= 1.01 * n1 and subset_point_id not in set_point:
                     set_point.add(subset_point_id)
                     obstacle_pts.append(point_cloud[subset_point_id])
@@ -494,7 +477,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     with open(str('./fileout/output_extract' + str(extract_nb) + '.geojson'), 'w') as geojson:
         dump(feature_collection, geojson)
 
-    print(max_heights)
+    #print(max_heights)
     
     # Visualise convex-hulls -> to obj file
     write_obstacles_to_obj(hulls)
