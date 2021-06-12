@@ -1,13 +1,15 @@
 import json
+import os
+from numpy.core.defchararray import array
+from numpy.lib.function_base import append
 from plyfile import PlyData
 import numpy as np
 import pandas as pd
-# import pywavefront
-import json
+from os import listdir
+from os.path import isfile, join
+
 # -- *all* code goes into 'roof_obstacles'
 import roof_obstacles
-import os
-
 
 input_ply = "./data/extract1_n_rad7.ply"
 input_obj = "./data/3d_one_building.obj"
@@ -104,12 +106,23 @@ def main():
         if (i > 2): continue
         data_np[:, i] = data_pd[name]
 
+    # -- READ ALL NUMPY ARRAYS: arrays x,y,z corresponding to the buildings
+    fileslist = [f for f in listdir("./data/pointclouds") if isfile(join("./data/pointclouds", f))]
+    arrays = []
+    for file in fileslist:
+        arr = np.load("./data/pointclouds/" + file)
+        for coord in arr:
+            arrays.append(coord)
+        #arrays.append(arr)
+    #print(arrays)
+
     # -- READ JSON: store the input in arrays
     read_json(input_json)
 
     # -- detect obstacles
     #npy_to_one_ply(input_pcs)
-    roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
+    #roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
+    roof_obstacles.detect_obstacles(arrays, json_vertices, json_boundaries, output_file, input_json)
 
 
 
