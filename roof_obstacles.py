@@ -12,7 +12,6 @@ from geojson import Point, Polygon, Feature, FeatureCollection, dump
 import json
 from shapely.geometry import Polygon, Point
 from shapely.ops import cascaded_union
-#import python-pcl
 
 def write_json(in_file, outfile, dict):
     inp_file = open(in_file, "r")
@@ -85,6 +84,14 @@ def unit_normal(a, b, c):
     magnitude = (x ** 2 + y ** 2 + z ** 2) ** .5
     return (x / magnitude, y / magnitude, z / magnitude)
 
+# This function is to get the surface without weighting it. 
+# It has to be weighted with 50% or 100% or zero !
+def get_surface_pixel3D(resolution, angle):
+    assert angle < 90
+    alpha = 90-angle
+    line = resolution/math.cos(alpha)
+    surf = line * resolution
+    return(surf)
 
 # area of polygon poly (embedded in 3D)
 def area_polygon_3d(poly):
@@ -152,6 +159,14 @@ def get_normal(point):
                        * math.sqrt((nx * nx) + (ny * ny) + (nz * nz)))])
     return (math.degrees(angle))   
 
+def get_surface_pixel3D(resolution, angle):
+    assert angle < 90
+    alpha = 90-angle
+    line = resolution/math.cos(alpha)
+    surf = line * resolution
+    return(surf)
+
+
 def extract_xyz(list):
     return [item[0:3] for item in list]
 
@@ -171,8 +186,6 @@ def write_obj(vertices, faces, fileout):
     countf = 1
     for building in faces:
         for f in building:
-            # print(vertices[f[0]][0])
-            # vertices_list = (vertices[f[0]][0], vertices[f[0]][1], vertices[f[0]][2])
             vertices_out.append(vertices[f[0]])
             vertices_out.append(vertices[f[1]])
             vertices_out.append(vertices[f[2]])
@@ -345,7 +358,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                     dict_points[id_point] = shortest_distance(point, plane_equation(p1, p2, p3))
                 id_point += 1
 
-            # Distance points to surface: discard points closer than threshold to define
+        # Distance points to surface: discard points closer than threshold to define
         threshold = 0.4
         for pid, p in enumerate(point_cloud):
             if dict_points[pid] > threshold:
@@ -456,6 +469,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         #print("Area free for solar panels (m**2) ! ", new_attribute_area3d, " (over ", area_3d, " in total)")
         #print("In percentage, this is ", new_attribute_percent, " % ", "of the roof surface")
         
+
         building_id = get_cityJSON_ID(input_json, building_nb - 1)
         dict_buildings[building_id] = new_attribute_area3d
 
