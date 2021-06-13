@@ -296,7 +296,7 @@ def write_obstacles_to_obj(hulls):
         file.close()
 
 def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
-    extract_nb = "4_n_rad7"  # variable to name properly the output files
+    extract = "4_n_rad7"  # variable to name properly the output files
 
     print("Number of vertices: ", len(vertices))
     print("Number of buildings: ", len(faces))
@@ -414,7 +414,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         
         # 4 -- OBSTACLE POINTS ARE OFFSET AS HEXAGONS AND MERGED IF OVERLAPPING
         hexagons = []
-        #print(obstacle_pts_final2d)
         for obs in obstacle_pts_final2d:
             x = obs[0]
             y = obs[1]
@@ -426,17 +425,20 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         hull = cascaded_union(hexagons)
 
         # 5 -- CONVEX-HULL OF THE MERGED HEXAGONS
-        try:  
-            # Multipolygon case
-            for poly_id in range(len(hull)):
-                conv_hull = hull[poly_id].convex_hull
-                hulls.append(conv_hull.exterior.coords)
-                hulls_polygons.append(conv_hull)
-        except:
-            # Polygon case
-            conv_hull = hull.convex_hull
-            hulls.append(conv_hull.exterior.coords)
-            hulls_polygons.append(conv_hull)
+        if hull.type == "MultiPolygon":  
+            for poly in hull:
+                buffered_back = poly.exterior.parallel_offset(0.2)
+                polygon_new = Polygon(buffered_back)
+                coords = polygon_new.exterior.coords
+                hulls.append(coords)
+                hulls_polygons.append(polygon_new)
+
+        if hull.type == "Polygon":  
+            buffered_back = hull.exterior.parallel_offset(0.2)
+            polygon_new = Polygon(buffered_back)
+            coords = polygon_new.exterior.coords
+            hulls.append(coords)
+            hulls_polygons.append(polygon_new)
 
         # Check and visualise clusters
         # write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")  
@@ -491,7 +493,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         }
     }
     feature_collection = FeatureCollection(features, crs=crs)
-    with open(str('./fileout/output_extract' + str(extract_nb) + '.geojson'), 'w') as geojson:
+    with open(str('./fileout/output_extract' + str(extract) + '.geojson'), 'w') as geojson:
         dump(feature_collection, geojson)
 
     #print(max_heights)
