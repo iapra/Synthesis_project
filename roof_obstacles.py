@@ -312,6 +312,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
 
     # 2 -- OBSTACLE POINTS EXTRACTION
     set_point = set()
+    set_point2 = set()
     building_nb = 1
     projected_area_2d = 0.00
     area_3d = 0.00
@@ -357,11 +358,12 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                     clean_points.append(point)
                     dict_points[id_point] = shortest_distance(point, plane_equation(p1, p2, p3))
                 id_point += 1
-
+                
         # Distance points to surface: discard points closer than threshold to define
         threshold = 0.4
         for pid, p in enumerate(point_cloud):
-            if dict_points[pid] > threshold:
+            if dict_points[pid] > threshold and pid not in set_point2:
+                set_point2.add(pid)
                 obstacle_pts.append(p)
                 stack_first.append(p)
             else:
@@ -397,7 +399,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             if count_higher < 2:
                 obstacle_pts_.append(_point_)
         
-        # We ge rid of isolated points
+        # We get rid of isolated points
         if len(obstacle_pts_) < 2: continue
         else:
             kd_first = scipy.spatial.KDTree(extract_xyz(obstacle_pts_))
@@ -412,6 +414,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         
         # 4 -- OBSTACLE POINTS ARE OFFSET AS HEXAGONS AND MERGED IF OVERLAPPING
         hexagons = []
+        #print(obstacle_pts_final2d)
         for obs in obstacle_pts_final2d:
             x = obs[0]
             y = obs[1]
