@@ -99,18 +99,18 @@ def clusterization(masks,bounds):
 		images.append(im)
 	return images
 
-def save_raster_clusterization(img,buildings,images):
+def save_raster_clusterization(img,buildings,clusters):
 	with open('./data/translations/translations.json') as f:
 		translations = json.load(f)
-	for r, image in enumerate(images):
+	for r, image in enumerate(clusters):
 		trans = translations[buildings["identificatie"][r]]
 		transform = from_origin(img[r].transform[2]-trans[0],img[r].transform[5]-trans[1],0.25,0.25)
 		new_array = rasterio.open('./raster_results/'+buildings["identificatie"][r]+'.tif', 
-							'w', driver='GTiff',
-							height = image.shape[0], width = image.shape[1],
-                           	count=1, dtype = str(image[0][0].dtype),
-                          	crs=28992, nodata = 0,
-            		        transform=transform)
+								'w', driver='GTiff',
+								height = image.shape[0], width = image.shape[1],
+	                           	count=1, dtype = str(image[0][0].dtype),
+	                          	crs=28992, nodata = 0,
+	            		        transform=transform)
 		new_array.write(image,1)
 		new_array.close()
 
@@ -133,6 +133,23 @@ def polygonize_raster(raster,images,ids, bag):
 		gpd_polygonized_raster1 = gpd_polygonized_raster1[gpd_polygonized_raster1.geometry.apply(lambda x : x.type!='GeometryCollection' )]
 		gpd_polygonized_raster1.to_file(parth_rest+ ids[index] + '.geojson', driver='GeoJSON', schema=None)
 
+def assign_obstacles(clusters):
+	clust = []
+	for img in clusters:
+		unique, counts = np.unique(img, return_counts=True)
+		while (counts[0]< counts[1] or counts[1]< counts[2]):
+				if counts[1] > counts[0]:
+					img = np.where(img != 1 , img, 3) 
+					img = np.where(img != 0 , img, 1)  
+					img = np.where(img != 3 , img, 0)
+				unique, counts = np.unique(img, return_counts=True)
+				if counts[2] > counts[1]:
+					img = np.where(img != 2 , img, 3) 
+					img = np.where(img != 1 , img, 2)  
+					img = np.where(img != 3 , img, 1) 
+		clust.append(img) 
+	return clust
+
 def main():
     bag =  read_geopandas()
     images = read_images(bag)
@@ -142,7 +159,8 @@ def main():
     masks = mask_buildings_images(buildings_t, images)
     clusters = clusterization(masks,img_bounds)
     ids = get_ids(bag)
-    save_raster_clusterization(images,bag,clusters)
+    clust = assign_obstacles(clusters)
+    save_raster_clusterization(images,bag,clust)
     polygonize_raster(clusters, images, ids, bag)
 if __name__ == '__main__':
     main()
