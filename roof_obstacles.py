@@ -316,6 +316,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     projected_area_2d = 0.00
     area_3d = 0.00
     max_heights = []
+    clean_points = []
     
     # --- This can be deleted for final code --- Parameter for threshold not used
     all_dist = []
@@ -340,7 +341,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         obstacle_pts = []
         point_toFace_dict = {}
         for triangle in building:
-            subset = []
             assert (len(triangle) == 3)
             p1 = vertices[triangle[0]]
             p2 = vertices[triangle[1]]
@@ -354,7 +354,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                 point_toFace_dict[xy] = triangle
                 if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point) and get_normal(point) < 50 and id_point not in set_point:
                     set_point.add(id_point)
-                    subset.append(point)
+                    clean_points.append(point)
                     dict_points[id_point] = shortest_distance(point, plane_equation(p1, p2, p3))
                 id_point += 1
 
@@ -367,21 +367,21 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             else:
                 continue
         
-        # We add neighbours having similar normal's orientation
+        # # We add neighbours having similar normal's orientation
         kd_total = scipy.spatial.KDTree(point_cloud[:, 0:3])
 
-        while (len(stack_first) > 0):
-            current_p = stack_first[-1]
-            stack_first.pop()
-            n1 = get_normal(current_p)
-            _subset_id = kd_total.query_ball_point(current_p[0:3], r=1)
-            for subset_point_id in _subset_id:
-                n2 = get_normal(point_cloud[subset_point_id])
-                if n2 >= 0.99 * n1 and n2 <= 1.01 * n1 and subset_point_id not in set_point:
-                    set_point.add(subset_point_id)
-                    obstacle_pts.append(point_cloud[subset_point_id])
-                    stack_first.append(point_cloud[subset_point_id])
-                else: continue
+        # while (len(stack_first) > 0):
+        #     current_p = stack_first[-1]
+        #     stack_first.pop()
+        #     n1 = get_normal(current_p)
+        #     _subset_id = kd_total.query_ball_point(current_p[0:3], r=1)
+        #     for subset_point_id in _subset_id:
+        #         n2 = get_normal(point_cloud[subset_point_id])
+        #         if n2 >= 0.99 * n1 and n2 <= 1.01 * n1 and subset_point_id not in set_point:
+        #             set_point.add(subset_point_id)
+        #             obstacle_pts.append(point_cloud[subset_point_id])
+        #             stack_first.append(point_cloud[subset_point_id])
+        #         else: continue
 
         # 3 -- CLEAN OBSTACLE POINTS
         obstacle_pts_ = []
