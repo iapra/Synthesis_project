@@ -10,7 +10,7 @@ from numpy import unique, where
 from sklearn.datasets import make_classification
 from geojson import Point, Polygon, Feature, FeatureCollection, dump
 import json
-from shapely.geometry import Polygon, Point
+from shapely.geometry import Polygon, Point, LineString
 from shapely.ops import cascaded_union
 
 def write_json(in_file, outfile, dict):
@@ -296,28 +296,26 @@ def write_obstacles_to_obj(hulls):
         file.close()
 
 def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
-    extract = "4_n_rad7"  # variable to name properly the output files
+    extract = "4_n_rad7"    # variable to name properly the output files
 
     print("Number of vertices: ", len(vertices))
     print("Number of buildings: ", len(faces))
-
-    dict_buildings = {}
-    dict_points = defaultdict(lambda:0)
-    obstacle_pts_total = []
-    hulls = []
-    features = []
 
     # 1 -- ROOF EXPORT IN OBJ FOR VISUALISATION: Check that faces are only roofs and LOD2
     write_obj(vertices, faces, './fileout/roofs_out.obj')
 
     # 2 -- OBSTACLE POINTS EXTRACTION
+    dict_buildings = {}
+    dict_points = defaultdict(lambda:0)
+    obstacle_pts_total = []     # -- Variable can be probably be deleted (used for ply obst_pts)
+    hulls = []
+    features = []
     set_point = set()
     set_point2 = set()
-    building_nb = 1
-    projected_area_2d = 0.00
-    area_3d = 0.00
+    projected_area_2d = 0.00    # -- Variable can be probably be deleted
+    area_3d = 0.00              # -- Variable can be probably be deleted
     max_heights = []
-    clean_points = []
+    building_nb = 1
     
     # --- This can be deleted for final code --- Parameter for threshold not used
     all_dist = []
@@ -355,7 +353,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                 point_toFace_dict[xy] = triangle
                 if isInside(p1, p2, p3, point) and isAbove(p1, p2, p3, point) and get_normal(point) < 50 and id_point not in set_point:
                     set_point.add(id_point)
-                    clean_points.append(point)
                     dict_points[id_point] = shortest_distance(point, plane_equation(p1, p2, p3))
                 id_point += 1
                 
@@ -369,7 +366,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             else:
                 continue
         
-        # # We add neighbours having similar normal's orientation
+        # We add neighbours having similar normal's orientation
         kd_total = scipy.spatial.KDTree(point_cloud[:, 0:3])
 
         # while (len(stack_first) > 0):
@@ -412,7 +409,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
                     obstacle_pts_final2d.append(_point_2[0:2])
                     obstacle_pts_total.append(_point_2)
         
-        # 4 -- OBSTACLE POINTS ARE OFFSET AS HEXAGONS AND MERGED IF OVERLAPPING
+        # 4 -- OBSTACLE POINTS ARE OFFSET (AS HEXAGONS) AND MERGED IF OVERLAPPING
         hexagons = []
         for obs in obstacle_pts_final2d:
             x = obs[0]
@@ -424,25 +421,30 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         # We merge the hegaxons
         hull = cascaded_union(hexagons)
 
-        # 5 -- CONVEX-HULL OF THE MERGED HEXAGONS
+        # 5 -- OFFSET-BACK OF THE MERGED HEXAGONS
         if hull.type == "MultiPolygon":  
             for poly in hull:
-                buffered_back = poly.exterior.parallel_offset(0.2)
+                buffered_back = poly.exterior.parallel_offset(param/1.5)
+                try:    
+                    polygon_new = Polygon(buffered_back)
+                    coords = polygon_new.exterior.coords
+                    hulls.append(coords)
+                    hulls_polygons.append(polygon_new)
+                except:
+                    hulls.append(poly.exterior.coords)
+                    hulls_polygons.append(poly)
+
+        if hull.type == "Polygon": 
+            buffered_back = hull.exterior.parallel_offset(param/1.5)
+            try:
                 polygon_new = Polygon(buffered_back)
                 coords = polygon_new.exterior.coords
                 hulls.append(coords)
                 hulls_polygons.append(polygon_new)
+            except:
+                hulls.append(hull.exterior.coords)
+                hulls_polygons.append(hull)
 
-        if hull.type == "Polygon":  
-            buffered_back = hull.exterior.parallel_offset(0.2)
-            polygon_new = Polygon(buffered_back)
-            coords = polygon_new.exterior.coords
-            hulls.append(coords)
-            hulls_polygons.append(polygon_new)
-
-        # Check and visualise clusters
-        # write_txt_cluster(dict_obstacles, obstacle_pts_final, "./fileout/cluster.txt")  
-        
         # Retrieve points_relative height to the 3d model
         for h in hulls_polygons:
             id_point2d = 0
@@ -470,11 +472,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         # Proportional cross product to pass from 2d to 3d (instead of projecting back in 3d)
         obst_3d = (obstacle_area * area_3d) / projected_area_2d
         new_attribute_area3d = area_3d - obst_3d
-        new_attribute_percent = (new_attribute_area3d / area_3d) *100
-        #print("Area free for solar panels (m**2) ! ", new_attribute_area3d, " (over ", area_3d, " in total)")
-        #print("In percentage, this is ", new_attribute_percent, " % ", "of the roof surface")
-        
-
+    
         building_id = get_cityJSON_ID(input_json, building_nb - 1)
         dict_buildings[building_id] = new_attribute_area3d
 
@@ -495,23 +493,18 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
     feature_collection = FeatureCollection(features, crs=crs)
     with open(str('./fileout/output_extract' + str(extract) + '.geojson'), 'w') as geojson:
         dump(feature_collection, geojson)
-
-    #print(max_heights)
     
     # Visualise convex-hulls -> to obj file
-    write_obstacles_to_obj(hulls)
+    write_obstacles_to_obj(hulls)                                       # -- Can be deleted
     
     # Store new attribute per building
-    # write_txt_cluster(dict_obstacles_total, obstacle_pts_total, "./fileout/clusters.txt")
-    write_ply(obstacle_pts_final, './fileout/points_obtacle.ply')
+    write_ply(obstacle_pts_final, './fileout/points_obtacle.ply')       # -- Can be deleted
     write_ply_final(point_cloud, dict_points, './fileout/point_cloud_final.ply')
 
-    # print("area 3D = ", area_3d)
-    # print("area 2D = ", projected_area_2d)
     print(dict_buildings)
 
     #write CityJSON
-    write_json(input_json, output_file, dict_buildings)
+    write_json(input_json, output_file, dict_buildings)                 # -- TO UPDATEE !
     return
 
 
