@@ -11,7 +11,7 @@ from rasterio.crs import CRS
 from rasterio.transform import from_origin
 
 def read_geopandas():
-	path_pol = './data/classification_features/data.json'
+	path_pol = './data/classification_features/data.geojson'
 	bag = gpd.read_file(path_pol)
 	return bag
 

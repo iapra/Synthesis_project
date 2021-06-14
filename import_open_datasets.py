@@ -48,7 +48,8 @@ def import_ids(input):
 	import_wms(bboxes)
 
 	#write features in geojson
-	data.to_file("./data/classification_features/data.json", driver="GeoJSON")
+	data.crs = 28992
+	data.to_file("./data/classification_features/data.geojson", driver="GeoJSON")
 
 	# get features for alignment
 	get_alignment_features(bboxes)
