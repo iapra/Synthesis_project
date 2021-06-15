@@ -50,8 +50,8 @@ def get_big_building(buildings):
 
 #Create different polygons and translate it.
 def create_translations(cs, polygons,trans):
-    x = np.linspace(-3,3,41)#41
-    y = np.linspace(-3,3,41)
+    x = np.linspace(-5,5,41)#41
+    y = np.linspace(-5,5,41)
     for i in x:
         for j in y:
             pol = cs.translate(xoff = i, yoff=j)

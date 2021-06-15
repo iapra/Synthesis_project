@@ -23,13 +23,13 @@ def combine_rasters(pc,pct):
 		pcr[0] = np.where(pcr[0]> 0, 1, pcr[0])
 		final = np.copy( pcr)
 		for (x,y), value in np.ndenumerate(pcr[0]): 
-			if pcr[0][x,y]==1 and r[x,y]==1: #Good Pixel
+			if pcr[0][x,y]==1 and r[x,y]==2: #Good Pixel
 				final[0][x,y]=100
-			elif pcr[0][x,y]==0 and r[x,y]==1: #Medium Pixel
+			elif pcr[0][x,y]==0 and r[x,y]==2: #Medium Pixel
 				final[0][x,y]=50
-			elif r[x,y]==2 and pcr[0][x,y]==1: #Medium Pixel
+			elif r[x,y]==1 and pcr[0][x,y]==1: #Medium Pixel
 				final[0][x,y]=50
-			elif r[x,y]==2 and pcr[0][x,y]==0: #Bad pixel
+			elif r[x,y]==1 and pcr[0][x,y]==0: #Bad pixel
 			    final[0][x,y]=0
 			else:
 				final[0][x,y]=-9999 #non existant pixel
@@ -205,7 +205,7 @@ def main(obst_geo):
 	pct = gpd.read_file(obst_geo)
 	combine_rasters(pc,pct)
 	# -- READ PLY: store the input 3D points in np array
-	plydata = PlyData.read('./data/brink/all_bdg_rad3.ply')        # read file
+	plydata = PlyData.read('./data/brink/50_bdg_rad5.ply')        # read file
 	data = plydata.elements[0].data                         # read data
 	df = gpd.GeoDataFrame(data)
 	data_pd = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.x, df.y, df.z)) # Convert to DataFrame, because DataFrame can parse structured data
