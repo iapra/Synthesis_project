@@ -5,46 +5,28 @@ from numpy.lib.function_base import append
 from plyfile import PlyData
 import numpy as np
 import pandas as pd
+import geopandas as gpd
 from os import listdir
 from os.path import isfile, join
+import csv
+import time
 
 # -- *all* code goes into 'roof_obstacles'
 import roof_obstacles
+import image_classification
+import combine_results
+#from deeplearning.predict.main import solar_panel_test
 
-input_ply = "./data/extract1_n_rad7.ply"
-input_obj = "./data/3d_one_building.obj"
-output_file = "./fileout/out.json"
-input_json = "./data/extract1.json"
-input_pcs = "./data/pointclouds/"
+input_ply = "./data/brink/50_bdg_rad5.ply"
+input_json = "./data/brink/50_bdg.json"
+output_files = "./fileout/out"
+#input_pcs = "./data/pointclouds/"
 
 # -- Structures to get the input elements:
 vertices = []
 faces = []
 json_boundaries = []
 json_vertices = []
-
-def yield_file(in_file):
-    f = open(in_file)
-    buf = f.read()
-    f.close()
-    for b in buf.split('\n'):
-        if b.startswith('v '):
-            yield ['v', [float(x) for x in b.split(" ")[1:]]]
-        elif b.startswith('f '):
-            triangles = b.split(' ')[1:]
-            yield ['f', [int(t.split("/")[0]) for t in triangles]]
-        else:
-            yield ['', ""]
-
-def read_obj(in_file):
-    for k, v in yield_file(in_file):
-        if k == 'v':
-            vertices.append(v)
-        elif k == 'f':
-            faces.append(v)
-
-    if not len(faces) or not len(vertices):
-        return None
 
 def read_json(in_file):
     f = open(in_file)
@@ -71,6 +53,18 @@ def read_json(in_file):
         vtx[1] = (vtx[1] * data["transform"]["scale"][1]) + data["transform"]["translate"][1]
         vtx[2] = (vtx[2] * data["transform"]["scale"][2]) + data["transform"]["translate"][2]
 
+def read_ply(input_ply):
+    plydata = PlyData.read(input_ply)                       # read file
+    data = plydata.elements[0].data                         # read data
+    data_pd = pd.DataFrame(data)                            # Convert to DataFrame, because DataFrame can parse structured data
+
+    # This keeps all properties (x, y, z, nx, ny, nz)
+    point_cloud = np.zeros(data_pd.shape, dtype=np.float64)     # Initialize the array of stored data
+    property_names = data[0].dtype.names                        # read the name of the property
+    for i, name in enumerate(property_names):                   # Read data according to property, so as to ensure that the data read is the same data type.
+        point_cloud[:, i] = data_pd[name]
+    return point_cloud
+
 def npy_to_one_ply(all_pc):
     all_data = []
     all_files = os.listdir(all_pc)
@@ -85,35 +79,65 @@ def npy_to_ply(all_pc):
     for pc in all_files:
         data = np.load(all_pc + pc)
         roof_obstacles.write_ply(data, './fileout/ply_pc/' + str(pc[:16]) + '.ply')
-        print("done")
+
+def write_json(in_file, outfile, csv_table, dict_buildings):
+    inp_file = open(in_file, "r")
+    json_obj = json.load(inp_file)
+    inp_file.close()
+
+    with open(csv_table, newline='') as csvfile:
+        r = csv.reader(csvfile, delimiter=',')
+        next(r, None)                                   # skip the headers
+        for row in r:
+            identificatie = row[0]
+            city_obj, roof_area = dict_buildings[identificatie]
+            obstacle_area = row[1]
+            available_area = (float(roof_area) - float(obstacle_area))
+            has_solar_panel = "False"                   # -- Replace with row[2]
+            json_obj["CityObjects"][city_obj]["attributes"]["obstacle_area (m^2)"] = obstacle_area
+            json_obj["CityObjects"][city_obj]["attributes"]["available_area (m^2)"] = available_area
+            json_obj["CityObjects"][city_obj]["attributes"]["has_solar_panel"] = has_solar_panel
+
+    inp_file = open(outfile, "w")
+    json.dump(json_obj, inp_file)
+    inp_file.close()
 
 def main():
+    start = time.perf_counter() 
     # -- READ PLY: store the input 3D points in np array
-    plydata = PlyData.read(input_ply)                       # read file
-    data = plydata.elements[0].data                         # read data
-    data_pd = pd.DataFrame(data)                            # Convert to DataFrame, because DataFrame can parse structured data
-
-    # THIS KEEPS ALL PROPERTIES (nb of returns, etc)
-    point_cloud = np.zeros(data_pd.shape, dtype=np.float64)     # Initialize the array of stored data
-    property_names = data[0].dtype.names                        # read the name of the property
-    for i, name in enumerate(property_names):                   # Read data according to property, so as to ensure that the data read is the same data type.
-        point_cloud[:, i] = data_pd[name]
-
-    # THIS KEEPS ONLY x,y,z
-    data_np = np.zeros((data_pd.shape[0], 3), dtype=float)  # Initialize the array of stored data
-    property_names = data[0].dtype.names
-    for i, name in enumerate(property_names):
-        if (i > 2): continue
-        data_np[:, i] = data_pd[name]
+    point_cloud = read_ply(input_ply)
 
     # -- READ JSON: store the input in arrays
     read_json(input_json)
 
-    # -- detect obstacles
-    #npy_to_one_ply(input_pcs)
-    roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
+    # -- Detect obstacles
+    print("\ninit geometry based detection")
+    geojson_part1, dict_buildings = roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_files, input_json)
+    
+    # -- Image classification
+    print("\ninit image classification")
+    image_classification.main()
+    # -- Merge part 1 and part 2
+    print("\ninit combine geometry and image class")
+    combine_results.main(geojson_part1)
+        
+    # -- Solar panel Detection
+    #print("init solar panel detection")
+    #roof = pd.read_csv('roof_semantics.csv')
+    #solar = []
+    #for index, row in roof.iterrows():
+    #    solar_bool = solar_panel_test(row.identificatie)
+    #    solar.append(solar_bool)
+    #roof['has_solar_panels']= solar
+    #df.to_csv('roof_semantics.csv',index=False)
 
+    # -- CityJSON output
+    csv = 'roof_semantics.csv'
+    write_json(input_json, output_files + '.json', csv, dict_buildings)  
 
+    # -- Time for computation
+    end = time.perf_counter() 
+    print("Time elapsed during the calculation:", (end - start)/60, " min")
 
 if __name__ == '__main__':
     main()
