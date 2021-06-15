@@ -47,6 +47,18 @@ def read_json(in_file):
         vtx[1] = (vtx[1] * data["transform"]["scale"][1]) + data["transform"]["translate"][1]
         vtx[2] = (vtx[2] * data["transform"]["scale"][2]) + data["transform"]["translate"][2]
 
+def read_ply(input_ply):
+    plydata = PlyData.read(input_ply)                       # read file
+    data = plydata.elements[0].data                         # read data
+    data_pd = pd.DataFrame(data)                            # Convert to DataFrame, because DataFrame can parse structured data
+
+    # This keeps all properties (x, y, z, nx, ny, nz)
+    point_cloud = np.zeros(data_pd.shape, dtype=np.float64)     # Initialize the array of stored data
+    property_names = data[0].dtype.names                        # read the name of the property
+    for i, name in enumerate(property_names):                   # Read data according to property, so as to ensure that the data read is the same data type.
+        point_cloud[:, i] = data_pd[name]
+    return point_cloud
+
 def npy_to_one_ply(all_pc):
     all_data = []
     all_files = os.listdir(all_pc)
@@ -64,15 +76,7 @@ def npy_to_ply(all_pc):
 
 def main():
     # -- READ PLY: store the input 3D points in np array
-    plydata = PlyData.read(input_ply)                       # read file
-    data = plydata.elements[0].data                         # read data
-    data_pd = pd.DataFrame(data)                            # Convert to DataFrame, because DataFrame can parse structured data
-
-    # This keeps all properties (x, y, z, nx, ny, nz)
-    point_cloud = np.zeros(data_pd.shape, dtype=np.float64)     # Initialize the array of stored data
-    property_names = data[0].dtype.names                        # read the name of the property
-    for i, name in enumerate(property_names):                   # Read data according to property, so as to ensure that the data read is the same data type.
-        point_cloud[:, i] = data_pd[name]
+    point_cloud = read_ply(input_ply)
 
     # -- READ JSON: store the input in arrays
     read_json(input_json)
@@ -82,7 +86,7 @@ def main():
     
     # -- Image classification
 
-    # -- Derge part 1 and part 2
+    # -- Merge part 1 and part 2
     
     # -- CityJSON output
     #write_json(input_json, output_file, dict_buildings)  
