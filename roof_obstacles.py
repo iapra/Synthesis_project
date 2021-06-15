@@ -12,12 +12,29 @@ from geojson import Point, Polygon, Feature, FeatureCollection, dump
 import json
 from shapely.geometry import Polygon, Point, LineString
 from shapely.ops import cascaded_union
+import re
 
 ## --- Math functions
 
 def area_2d(p1, p2, p3):
     return abs((p1[0] * (p2[1] - p3[1]) + p2[0] * (p3[1] - p1[1])
                 + p3[0] * (p1[1] - p2[1])) / 2.0)
+
+# area of polygon poly (embedded in 3D)
+def area_polygon_3d(poly):
+    if len(poly) < 3:  # not a plane - no area
+        return 0
+    total = [0, 0, 0]
+    N = len(poly)
+    for i in range(N):
+        vi1 = poly[i]
+        vi2 = poly[(i + 1) % N]
+        prod = np.cross(vi1, vi2)
+        total[0] += prod[0]
+        total[1] += prod[1]
+        total[2] += prod[2]
+    result = np.dot(total, unit_normal(poly[0], poly[1], poly[2]))
+    return abs(result / 2)
 
 def isInside(p1, p2, p3, p):
     # A function to check whether point p lies inside the triangle p1,p2,p3
@@ -125,7 +142,9 @@ def get_buildingID(json_in, index):
         data = json.load(f)
         building_id = list(data["CityObjects"].keys())[index]
         identificatie = data["CityObjects"][building_id]["attributes"]["identificatie"]
-        return (identificatie)
+        # We remove the no-digit part
+        id = re.sub('\D', '', identificatie)
+        return (id)
 
 
 ## --- Functions to write various files
@@ -266,6 +285,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_files, input_json):
     #write_obj(vertices, faces, './fileout/roofs_out.obj')
 
     # 2 -- OBSTACLE POINTS EXTRACTION
+    dict_buildings = {}
     dict_points = defaultdict(lambda:0)
     obstacle_pts_total = []
     hulls = []
@@ -276,6 +296,7 @@ def detect_obstacles(point_cloud, vertices, faces, output_files, input_json):
     building_nb = 1
 
     for building in faces:
+        roof_area = 0.00
         hulls_polygons = []
         stack_first = deque()
         obstacle_pts = []
@@ -285,7 +306,8 @@ def detect_obstacles(point_cloud, vertices, faces, output_files, input_json):
             p1 = vertices[triangle[0]]
             p2 = vertices[triangle[1]]
             p3 = vertices[triangle[2]]
-
+            roof_area += area_polygon_3d([p1, p2, p3])
+        
             id_point = 0
             for point in point_cloud:
                 xy = (point[0], point[1])
@@ -398,7 +420,13 @@ def detect_obstacles(point_cloud, vertices, faces, output_files, input_json):
                 id_point2d += 1
             max_heights.append(max_height)
         
-         
+        # Dictionnary used for final CityJSON
+        
+        identificatie = get_buildingID(input_json, building_nb - 1)
+        cityJSON_id = get_cityJSON_ID(input_json, building_nb - 1)
+        value = (cityJSON_id, roof_area)
+        dict_buildings[identificatie] = value
+
         # 5 -- OBSTACLE AREA COMPUTATION 2D
         obstacle_area = 0
         for polygon in hulls_polygons:
@@ -426,10 +454,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_files, input_json):
     #write_ply(obstacle_pts_final, './fileout/points_obtacle.ply')
     write_ply_final(point_cloud, dict_points, output_files + '.ply')
     print('New point cloud stored in ' + output_files + '.ply')
-    
-    return (output_files + '.geojson')
 
-    #write CityJSON
-    #write_json(input_json, output_file, dict_buildings)    
-
-
+    print(dict_buildings)
+    return ((output_files + '.geojson'), dict_buildings)

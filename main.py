@@ -8,6 +8,8 @@ import pandas as pd
 import geopandas as gpd
 from os import listdir
 from os.path import isfile, join
+import csv
+import time
 
 # -- *all* code goes into 'roof_obstacles'
 import roof_obstacles
@@ -15,8 +17,8 @@ import image_classification
 import combine_results
 #from deeplearning.predict.main import solar_panel_test
 
-input_ply = "./data/extract1_n_rad7.ply"
-input_json = "./data/extract1.json"
+input_ply = "./data/brink/50_bdg_rad5.ply"
+input_json = "./data/brink/50_bdg.json"
 output_files = "./fileout/out"
 #input_pcs = "./data/pointclouds/"
 
@@ -78,7 +80,30 @@ def npy_to_ply(all_pc):
         data = np.load(all_pc + pc)
         roof_obstacles.write_ply(data, './fileout/ply_pc/' + str(pc[:16]) + '.ply')
 
+def write_json(in_file, outfile, csv_table, dict_buildings):
+    inp_file = open(in_file, "r")
+    json_obj = json.load(inp_file)
+    inp_file.close()
+
+    with open(csv_table, newline='') as csvfile:
+        r = csv.reader(csvfile, delimiter=',')
+        next(r, None)                                   # skip the headers
+        for row in r:
+            identificatie = row[0]
+            city_obj, roof_area = dict_buildings[identificatie]
+            obstacle_area = row[1]
+            available_area = (float(roof_area) - float(obstacle_area))
+            has_solar_panel = "False"                   # -- Replace with row[2]
+            json_obj["CityObjects"][city_obj]["attributes"]["obstacle_area (m^2)"] = obstacle_area
+            json_obj["CityObjects"][city_obj]["attributes"]["available_area (m^2)"] = available_area
+            json_obj["CityObjects"][city_obj]["attributes"]["has_solar_panel"] = has_solar_panel
+
+    inp_file = open(outfile, "w")
+    json.dump(json_obj, inp_file)
+    inp_file.close()
+
 def main():
+    start = time.perf_counter() 
     # -- READ PLY: store the input 3D points in np array
     point_cloud = read_ply(input_ply)
 
@@ -86,14 +111,14 @@ def main():
     read_json(input_json)
 
     # -- Detect obstacles
-    print("init geometry based detection")
-    geojson_part1 = roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_files, input_json)
+    print("\ninit geometry based detection")
+    geojson_part1, dict_buildings = roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_files, input_json)
     
     # -- Image classification
-    print("init image classification")
+    print("\ninit image classification")
     image_classification.main()
     # -- Merge part 1 and part 2
-    print("init combine geometry and image class")
+    print("\ninit combine geometry and image class")
     combine_results.main(geojson_part1)
         
     # -- Solar panel Detection
@@ -105,10 +130,14 @@ def main():
     #    solar.append(solar_bool)
     #roof['has_solar_panels']= solar
     #df.to_csv('roof_semantics.csv',index=False)
+
     # -- CityJSON output
-    #write_json(input_json, output_file, dict_buildings)  
+    csv = 'roof_semantics.csv'
+    write_json(input_json, output_files + '.json', csv, dict_buildings)  
 
-
+    # -- Time for computation
+    end = time.perf_counter() 
+    print("Time elapsed during the calculation:", (end - start)/60, " min")
 
 if __name__ == '__main__':
     main()
