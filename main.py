@@ -5,11 +5,15 @@ from numpy.lib.function_base import append
 from plyfile import PlyData
 import numpy as np
 import pandas as pd
+import geopandas as gpd
 from os import listdir
 from os.path import isfile, join
 
 # -- *all* code goes into 'roof_obstacles'
 import roof_obstacles
+import image_classification
+import combine_results
+#from deeplearning.predict.main import solar_panel_test
 
 input_ply = "./data/extract1_n_rad7.ply"
 input_json = "./data/extract1.json"
@@ -82,12 +86,25 @@ def main():
     read_json(input_json)
 
     # -- Detect obstacles
+    print("init geometry based detection")
     geojson_part1 = roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_files, input_json)
     
     # -- Image classification
-
+    print("init image classification")
+    image_classification.main()
     # -- Merge part 1 and part 2
-    
+    print("init combine geometry and image class")
+    combine_results.main(geojson_part1)
+        
+    # -- Solar panel Detection
+    #print("init solar panel detection")
+    #roof = pd.read_csv('roof_semantics.csv')
+    #solar = []
+    #for index, row in roof.iterrows():
+    #    solar_bool = solar_panel_test(row.identificatie)
+    #    solar.append(solar_bool)
+    #roof['has_solar_panels']= solar
+    #df.to_csv('roof_semantics.csv',index=False)
     # -- CityJSON output
     #write_json(input_json, output_file, dict_buildings)  
 

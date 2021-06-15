@@ -10,12 +10,13 @@ from rasterio.features import shapes
 from rasterio.crs import CRS
 from rasterio.transform import from_origin
 
+#Read fuetures to be classified
 def read_geopandas():
 	path_pol = './data/classification_features/data.geojson'
 	bag = gpd.read_file(path_pol)
 	return bag
 
-
+#Read images to perform classification
 def read_images(bag):
 	images = []
 	path_img = './data/images/'
@@ -24,6 +25,8 @@ def read_images(bag):
 		img = rasterio.open(path_img + image_path	+'.tif')
 		images.append(img)
 	return images
+
+#Get bounds of an image	
 def get_image_bounds(images):
 	bounds = []
 	for img in images:
@@ -35,6 +38,8 @@ def get_image_bounds(images):
 		l = rgb.shape[1]
 		bounds.append((w,l))
 	return bounds	
+
+#Get bounds of a feature	
 def get_bounds(bag):
 	bounds = []
 	for index, row in bag.iterrows():   
@@ -51,6 +56,7 @@ def get_ids(bag):
 		ids.append(row.identificatie)
 	return ids
 
+#Trasnlate thefootprint according to the alignment.
 def dtranslate(bag,mult):
 	translations = []
 	identificaties	= []
@@ -66,6 +72,7 @@ def dtranslate(bag,mult):
 	buildings = gpd.GeoDataFrame(tmp)		
 	return buildings
 
+#Clip the images with the buildings
 def mask_buildings_images(buildings, images):
 	lists= []
 	for index, row in buildings.iterrows():
@@ -74,6 +81,7 @@ def mask_buildings_images(buildings, images):
 		lists.append(out)
 	return lists 
 
+#Flatten bands of a nD numpy array
 def flatten_bands(bands):
     n = []
     for im in bands:
@@ -83,6 +91,7 @@ def flatten_bands(bands):
     x= x.transpose()
     return x
 
+#K-means clusterization
 def clusterization(masks,bounds):
 	clusters = []
 	for out in masks:
@@ -99,6 +108,7 @@ def clusterization(masks,bounds):
 		images.append(im)
 	return images
 
+#Write raster clusterization
 def save_raster_clusterization(img,buildings,clusters):
 	with open('./data/translations/translations.json') as f:
 		translations = json.load(f)
@@ -133,6 +143,7 @@ def polygonize_raster(raster,images,ids, bag):
 		gpd_polygonized_raster1 = gpd_polygonized_raster1[gpd_polygonized_raster1.geometry.apply(lambda x : x.type!='GeometryCollection' )]
 		gpd_polygonized_raster1.to_file(parth_rest+ ids[index] + '.geojson', driver='GeoJSON', schema=None)
 
+#Asign obstacles
 def assign_obstacles(clusters):
 	clust = []
 	for img in clusters:
@@ -161,6 +172,6 @@ def main():
     ids = get_ids(bag)
     clust = assign_obstacles(clusters)
     save_raster_clusterization(images,bag,clust)
-    polygonize_raster(clusters, images, ids, bag)
+    #polygonize_raster(clusters, images, ids, bag)
 if __name__ == '__main__':
     main()

@@ -25,13 +25,14 @@ def read_input(input):
     	input  = {"boundingbox": bbox }
     	return align_by_bbox(bbox)
 
+#Read geojson of the features to be aligned.
 def read_geojson_id(buildings):
     ids = []
     for id in buildings:
         data = gpd.read_file('./data/alignment_features/'+ id + '.json')
         ids.append(data)
     return ids
-
+#Get the building from a set of properties according to the parameters given (identificatie)
 def get_big_building(buildings):
     ids = read_geojson_id(buildings)
     comlete_shape = []
@@ -47,6 +48,7 @@ def get_big_building(buildings):
         comlete_shape.append(complete_id)
     return comlete_shape    
 
+#Create different polygons and translate it.
 def create_translations(cs, polygons,trans):
     x = np.linspace(-3,3,41)#41
     y = np.linspace(-3,3,41)
@@ -55,7 +57,7 @@ def create_translations(cs, polygons,trans):
             pol = cs.translate(xoff = i, yoff=j)
             polygons.append(pol)
             trans.append((i,j))
-
+#read images of the buildings
 def read_images(buildings):
     images = []
     for id in buildings:
@@ -63,6 +65,7 @@ def read_images(buildings):
         images.append(img)
     return images
 
+#Alignment 
 def align_by_id(buildings):
     cs = get_big_building(buildings)
     images = read_images(buildings)
@@ -112,8 +115,8 @@ def align_by_id(buildings):
             trans[iden] = translations[index]
         with open('./data/translations/translations.json', 'w') as json_file:
                 json.dump(trans, json_file)
-def main():
-    read_input('params.json')
+def main(params):
+    read_input(params)
 
 if __name__ == '__main__':
-    main()
+    main(params)

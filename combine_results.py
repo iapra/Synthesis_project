@@ -14,7 +14,7 @@ from shapely.geometry import box
 from scipy.spatial import Delaunay
 import scipy
 
-
+#Combine restult of geometry obstacle detection and image classification
 def combine_rasters(pc,pct):
 	for index, rows in pc.iterrows():
 		with rasterio.open('./raster_results/'+rows.identificatie+".tif") as src:
@@ -22,15 +22,17 @@ def combine_rasters(pc,pct):
 			pcr, out_transform = rasterio.mask.mask(src, pct.geometry)
 		pcr[0] = np.where(pcr[0]> 0, 1, pcr[0])
 		final = np.copy( pcr)
-		for (y,x), value in np.ndenumerate(pcr[0]): 
-			if pcr[0][y,x]==1: #Good Pixel
-				final[0][y,x]=100
-			elif r[y,x]==2 and pcr[0][x,y]!=1: #Bad Pixel
-				final[0][y,x]=50
-			elif r[y,x]==1 and pcr[0][x,y]!=1:
-			    final[0][y,x]=0
+		for (x,y), value in np.ndenumerate(pcr[0]): 
+			if pcr[0][x,y]==1 and r[x,y]==1: #Good Pixel
+				final[0][x,y]=100
+			elif pcr[0][x,y]==0 and r[x,y]==1: #Medium Pixel
+				final[0][x,y]=50
+			elif r[x,y]==2 and pcr[0][x,y]==1: #Medium Pixel
+				final[0][x,y]=50
+			elif r[x,y]==2 and pcr[0][x,y]==0: #Bad pixel
+			    final[0][x,y]=0
 			else:
-				final[0][y,x]=-9999
+				final[0][x,y]=-9999 #non existant pixel
 		new_array = rasterio.open('./combine_results/'+rows.identificatie+'_mix.tif',
                       'w', driver='GTiff',
                          height =pcr.shape[1], width = pcr.shape[2],
@@ -38,8 +40,9 @@ def combine_rasters(pc,pct):
                           crs=28992, nodata = -9999,
                           transform=out_transform)
 		new_array.write(final[0],1)
-		new_array.close()		
+		new_array.close()	
 
+#Get normal of a point cloud
 def get_normal(nx,ny,nz):
     z1 = 0
     z2 = 0
@@ -50,6 +53,7 @@ def get_normal(nx,ny,nz):
                        * math.sqrt((nx * nx) + (ny * ny) + (nz * nz)))])
     return (math.degrees(angle))
 
+#IDW interpolation for a point cloud
 def idw_interpolation(list_pts_3d, identificatie):
     #get the extent of the points
     xmin = list_pts_3d.transpose()[0].min()-2
@@ -148,7 +152,7 @@ nodata_value -9999
                 asc.write('\n')
             asc.write(h)
 
-    print("File"+ identificatie +  "written",)
+    #print("File"+ identificatie +  "written",)
 
     return len(x)*len(y[0])*cell
 
@@ -175,6 +179,7 @@ def create_normal_raster(pc,data_pd):
 		points = points[:, (0, 1,9)]
 		idw_interpolation(points,ident)
  
+ #Compute the are of the obstacles
 def compute_area(pc):
 	area = []
 	for index, rows in pc.iterrows():
@@ -195,9 +200,9 @@ def compute_area(pc):
 	return area 
 
 
-def main():
+def main(obst_geo):
 	pc = gpd.read_file('./data/classification_features/data.geojson')
-	pct = gpd.read_file("./fileout/output_50_bdg.geojson")
+	pct = gpd.read_file(obst_geo)
 	combine_rasters(pc,pct)
 	# -- READ PLY: store the input 3D points in np array
 	plydata = PlyData.read('./data/brink/all_bdg_rad3.ply')        # read file
@@ -209,7 +214,7 @@ def main():
 	area = compute_area(pc)
 	colnames =['identificatie','obstacle_area']
 	df = gpd.GeoDataFrame(area, columns = colnames)
-	df.to_csv('obtacle_area.csv',index=False)
+	df.to_csv('roof_semantics.csv',index=False)
 	print("final results ready")
 if __name__ == '__main__':
-    main()
+    main(obst_geo)

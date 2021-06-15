@@ -11,9 +11,10 @@ import roof_classification
 def main():
 	print("starting roof image classification")
 	print("importing datasets")
-	import_open_datasets.read_input("params.json")
+	params = "params.json"
+	import_open_datasets.read_input(params)
 	print("aligning features")
-	align_features.main()
+	align_features.main(params)
 	print("image classification")
 	roof_classification.main()
 if __name__ == '__main__':

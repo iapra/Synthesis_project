@@ -27,6 +27,7 @@ def read_input(input):
     	input  = {"boundingbox": bbox }
     	import_bbox(input)
 
+#import features from PDOK BAG WFS by identificatie
 def import_ids(input):
 	feat = input["identificatie"]
 	features = join_ids(feat)
@@ -54,10 +55,12 @@ def import_ids(input):
 	# get features for alignment
 	get_alignment_features(bboxes)
 
+
 def get_wms_details(url, version="1.3.0"):
     wms = WebMapService(url, version=version)
     return wms
 
+#import images from Aerial Luchtfoto from PDOK in a WMS, according to a bounding box
 def import_wms(bboxes):
 	images =[]
 	count = 0
@@ -97,6 +100,7 @@ def join_ids(feat):
 	s = ",".join([item for item in rel])
 	return s
 
+#Get through WFS the neighbouring features of one identificatie
 def get_alignment_features(bbox_big):
 	for building	in bbox_big:
 		bbox = building[:-1]
