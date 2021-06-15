@@ -1,10 +1,16 @@
-from .geometry import get_fixed_box
-from .pdok import get_bag_pand, get_luchtfoto_rgb_array
-from .rasterize import shape_as_mask
-from .process import prep_input, filter_predict, mask_predict, map_predict
+if __name__ != "__main__":
+    import os
+    import sys
+    _dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.append(_dir)
+
+from geometry import get_fixed_box
+from pdok import get_bag_pand, get_luchtfoto_rgb_array
+from rasterize import shape_as_mask
+from process import prep_input, filter_predict, mask_predict, map_predict
 
 # Resolution, size and sigma depend on the chosen model
-from .models import rgb as model
+from models import rgb as model
 _resolution = (256,256)
 _size = (50,50)
 _sigma = 5
