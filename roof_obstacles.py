@@ -13,36 +13,11 @@ import json
 from shapely.geometry import Polygon, Point, LineString
 from shapely.ops import cascaded_union
 
-def write_json(in_file, outfile, dict):
-    inp_file = open(in_file, "r")
-    json_obj = json.load(inp_file)
-    inp_file.close()
-
-    for key in dict:
-        json_obj["CityObjects"][key]["attributes"]["available solar potential area (m^2)"] = dict[key]
-
-    inp_file = open(outfile, "w")
-    json.dump(json_obj, inp_file)
-    inp_file.close()
-
-def get_cityJSON_ID(json_in, index):
-    with open(json_in, 'r') as f:
-        data = json.load(f)
-        building_id = list(data["CityObjects"].keys())[index]
-        return (building_id)
-
-def get_buildingID(json_in, index):
-    with open(json_in, 'r') as f:
-        data = json.load(f)
-        building_id = list(data["CityObjects"].keys())[index]
-        identificatie = data["CityObjects"][building_id]["attributes"]["identificatie"]
-        return (identificatie)
-
+## --- Math functions
 
 def area_2d(p1, p2, p3):
     return abs((p1[0] * (p2[1] - p3[1]) + p2[0] * (p3[1] - p1[1])
                 + p3[0] * (p1[1] - p2[1])) / 2.0)
-
 
 def isInside(p1, p2, p3, p):
     # A function to check whether point p lies inside the triangle p1,p2,p3
@@ -58,7 +33,6 @@ def isInside(p1, p2, p3, p):
     else:
         return False
 
-
 def isAbove(p1, p2, p3, p):
     det_above = np.linalg.det([[p1[0], p1[1], p1[2], 1],
                                [p2[0], p2[1], p2[2], 1],
@@ -68,7 +42,6 @@ def isAbove(p1, p2, p3, p):
         return True
     else:
         return False
-
 
 # unit normal vector of plane defined by points a, b, and c
 def unit_normal(a, b, c):
@@ -83,15 +56,6 @@ def unit_normal(a, b, c):
                        [c[0], c[1], 1]])
     magnitude = (x ** 2 + y ** 2 + z ** 2) ** .5
     return (x / magnitude, y / magnitude, z / magnitude)
-
-# This function is to get the surface without weighting it. 
-# It has to be weighted with 50% or 100% or zero !
-def get_surface_pixel3D(resolution, angle):
-    assert angle < 90
-    alpha = 90-angle
-    line = resolution/math.cos(alpha)
-    surf = line * resolution
-    return(surf)
 
 # area of polygon poly (embedded in 3D)
 def area_polygon_3d(poly):
@@ -108,7 +72,6 @@ def area_polygon_3d(poly):
         total[2] += prod[2]
     result = np.dot(total, unit_normal(poly[0], poly[1], poly[2]))
     return abs(result / 2)
-
 
 def plane_equation(v1, v2, v3):
     # Function to find plane equation
@@ -133,19 +96,6 @@ def shortest_distance(p, equation_coef):
     denum = (math.sqrt(a * a + b * b + c * c))
     return numerator / denum
 
-
-def distance_2p(p1, p2):
-    math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2 + (p2[2] - p1[1]) ** 2)
-
-
-# --- This can be deleted for final code
-def get_height_difference(vertices):
-    z = []
-    for vertex in vertices:
-        z.append(vertex[2])
-    height_diff = max(z) - min(z)
-    return height_diff
-
 def get_normal(point):
     z1 = 0
     z2 = 0
@@ -159,26 +109,38 @@ def get_normal(point):
                        * math.sqrt((nx * nx) + (ny * ny) + (nz * nz)))])
     return (math.degrees(angle))   
 
-def get_surface_pixel3D(resolution, angle):
-    assert angle < 90
-    alpha = 90-angle
-    line = resolution/math.cos(alpha)
-    surf = line * resolution
-    return(surf)
-
-
 def extract_xyz(list):
     return [item[0:3] for item in list]
 
+## --- Functions to retrieve info in input files
 
-# --- This can be deleted for final code
-def get_slope(p1, p2):
-    length = math.sqrt((p2[0] - p1[[0]]) ** 2 + (p2[1] - p1[[1]]) ** 2 + (p2[2] - p1[[2]]) ** 2)
-    length_2d = math.sqrt((p2[0] - p1[[0]]) ** 2 + (p2[1] - p1[[1]]) ** 2)
-    try:
-        return math.acos(length_2d / length)
-    except:
-        return 0
+def get_cityJSON_ID(json_in, index):
+    with open(json_in, 'r') as f:
+        data = json.load(f)
+        building_id = list(data["CityObjects"].keys())[index]
+        return (building_id)
+
+def get_buildingID(json_in, index):
+    with open(json_in, 'r') as f:
+        data = json.load(f)
+        building_id = list(data["CityObjects"].keys())[index]
+        identificatie = data["CityObjects"][building_id]["attributes"]["identificatie"]
+        return (identificatie)
+
+
+## --- Functions to write various files
+
+def write_json(in_file, outfile, dict):
+    inp_file = open(in_file, "r")
+    json_obj = json.load(inp_file)
+    inp_file.close()
+
+    for key in dict:
+        json_obj["CityObjects"][key]["attributes"]["available solar potential area (m^2)"] = dict[key]
+
+    inp_file = open(outfile, "w")
+    json.dump(json_obj, inp_file)
+    inp_file.close()
 
 def write_obj(vertices, faces, fileout):
     vertices_out = []
@@ -235,7 +197,7 @@ def write_ply_final(point_cloud, dict_points, fileout):
         tuples.append(point)
         pid += 1
     a = np.array(tuples, dtype=[('x', 'f8'), ('y', 'f8'), ('z', 'f8'), ('distance_to_plane', 'f8')])
-    print("Number of points in PLY file: ", len(point_cloud))
+    print("Number of points in the final point cloud: ", len(point_cloud))
     # write PLY
     el = PlyElement.describe(a, 'vertex')
     with open(fileout, mode='wb') as f:
@@ -295,45 +257,24 @@ def write_obstacles_to_obj(hulls):
             file.write("\n")
         file.close()
 
-def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
-    extract = "4_n_rad7"    # variable to name properly the output files
+def detect_obstacles(point_cloud, vertices, faces, output_files, input_json):
 
     print("Number of vertices: ", len(vertices))
     print("Number of buildings: ", len(faces))
 
     # 1 -- ROOF EXPORT IN OBJ FOR VISUALISATION: Check that faces are only roofs and LOD2
-    write_obj(vertices, faces, './fileout/roofs_out.obj')
+    #write_obj(vertices, faces, './fileout/roofs_out.obj')
 
     # 2 -- OBSTACLE POINTS EXTRACTION
-    dict_buildings = {}
     dict_points = defaultdict(lambda:0)
-    obstacle_pts_total = []     # -- Variable can be probably be deleted (used for ply obst_pts)
+    obstacle_pts_total = []
     hulls = []
     features = []
     set_point = set()
     set_point2 = set()
-    projected_area_2d = 0.00    # -- Variable can be probably be deleted
-    area_3d = 0.00              # -- Variable can be probably be deleted
     max_heights = []
     building_nb = 1
-    
-    # --- This can be deleted for final code --- Parameter for threshold not used
-    all_dist = []
-    for building in faces:
-        for triangle in building:
-            pt1 = vertices[triangle[0]]
-            pt2 = vertices[triangle[1]]
-            pt3 = vertices[triangle[2]]
-            for pt in point_cloud:
-                if isInside(pt1, pt2, pt3, pt) and isAbove(pt1, pt2, pt3, pt) and get_normal(pt) < 50:
-                    dist2 = shortest_distance(pt, plane_equation(pt1, pt2, pt3))
-                    all_dist.append(dist2)
-    # We define the distance threshold to detect point obstacles
-    std = np.std(all_dist)
-    #threshold = 1.5*std
 
-    # ---- until here
-    
     for building in faces:
         hulls_polygons = []
         stack_first = deque()
@@ -344,8 +285,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             p1 = vertices[triangle[0]]
             p2 = vertices[triangle[1]]
             p3 = vertices[triangle[2]]
-            projected_area_2d += area_2d(p1, p2, p3)
-            area_3d += area_polygon_3d([p1, p2, p3])
 
             id_point = 0
             for point in point_cloud:
@@ -369,18 +308,18 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         # We add neighbours having similar normal's orientation
         kd_total = scipy.spatial.KDTree(point_cloud[:, 0:3])
 
-        # while (len(stack_first) > 0):
-        #     current_p = stack_first[-1]
-        #     stack_first.pop()
-        #     n1 = get_normal(current_p)
-        #     _subset_id = kd_total.query_ball_point(current_p[0:3], r=1)
-        #     for subset_point_id in _subset_id:
-        #         n2 = get_normal(point_cloud[subset_point_id])
-        #         if n2 >= 0.99 * n1 and n2 <= 1.01 * n1 and subset_point_id not in set_point:
-        #             set_point.add(subset_point_id)
-        #             obstacle_pts.append(point_cloud[subset_point_id])
-        #             stack_first.append(point_cloud[subset_point_id])
-        #         else: continue
+        while (len(stack_first) > 0):
+            current_p = stack_first[-1]
+            stack_first.pop()
+            n1 = get_normal(current_p)
+            _subset_id = kd_total.query_ball_point(current_p[0:3], r=1)
+            for subset_point_id in _subset_id:
+                n2 = get_normal(point_cloud[subset_point_id])
+                if n2 >= 0.99 * n1 and n2 <= 1.01 * n1 and subset_point_id not in set_point:
+                    set_point.add(subset_point_id)
+                    obstacle_pts.append(point_cloud[subset_point_id])
+                    stack_first.append(point_cloud[subset_point_id])
+                else: continue
 
         # 3 -- CLEAN OBSTACLE POINTS
         obstacle_pts_ = []
@@ -403,7 +342,6 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
             for _point_2 in obstacle_pts_:
                 query2 = kd_first.query_ball_point(_point_2[0:3], r=1)
                 if(len(query2)) > 2:
-                    # normal rate change parameter: and _point_2[-1] > 0.02
                     obstacle_pts_final.append(_point_2)
                     pt = (_point_2[0], _point_2[1])
                     obstacle_pts_final2d.append(_point_2[0:2])
@@ -465,20 +403,10 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         obstacle_area = 0
         for polygon in hulls_polygons:
             obstacle_area += polygon.area
-
-        # 6 -- OBSTACLE AREA COMPUTATION 3D
-
-        # Solar potential area computation
-        # Proportional cross product to pass from 2d to 3d (instead of projecting back in 3d)
-        obst_3d = (obstacle_area * area_3d) / projected_area_2d
-        new_attribute_area3d = area_3d - obst_3d
     
-        building_id = get_cityJSON_ID(input_json, building_nb - 1)
-        dict_buildings[building_id] = new_attribute_area3d
-
-        # 7 -- WRITE FILES TO GEOJSON (AND OTHERS)
+        # 6 -- WRITE POLYGONS TO GEOJSON
         for p in hulls_polygons:
-            features.append(Feature(geometry=p, properties={"CityObject": str(building_id),
+            features.append(Feature(geometry=p, properties={"CityObject": get_cityJSON_ID(input_json, building_nb - 1),
                                                             "Identificatie": get_buildingID(input_json, building_nb - 1),
                                                             "Max obstacle height": max_heights[-1]
                                                             }))
@@ -491,20 +419,17 @@ def detect_obstacles(point_cloud, vertices, faces, output_file, input_json):
         }
     }
     feature_collection = FeatureCollection(features, crs=crs)
-    with open(str('./fileout/output_extract' + str(extract) + '.geojson'), 'w') as geojson:
+    with open(output_files + '.geojson', 'w') as geojson:
         dump(feature_collection, geojson)
     
-    # Visualise convex-hulls -> to obj file
-    write_obstacles_to_obj(hulls)                                       # -- Can be deleted
+    # 7 -- STORE NEW POINT CLOUD (PLY) with distance-to-plane attribute
+    #write_ply(obstacle_pts_final, './fileout/points_obtacle.ply')
+    write_ply_final(point_cloud, dict_points, output_files + '.ply')
+    print('New point cloud stored in ' + output_files + '.ply')
     
-    # Store new attribute per building
-    write_ply(obstacle_pts_final, './fileout/points_obtacle.ply')       # -- Can be deleted
-    write_ply_final(point_cloud, dict_points, './fileout/point_cloud_final.ply')
-
-    print(dict_buildings)
+    return (output_files + '.geojson')
 
     #write CityJSON
-    write_json(input_json, output_file, dict_buildings)                 # -- TO UPDATEE !
-    return
+    #write_json(input_json, output_file, dict_buildings)    
 
 

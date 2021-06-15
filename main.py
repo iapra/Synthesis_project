@@ -12,39 +12,15 @@ from os.path import isfile, join
 import roof_obstacles
 
 input_ply = "./data/extract1_n_rad7.ply"
-input_obj = "./data/3d_one_building.obj"
-output_file = "./fileout/out.json"
 input_json = "./data/extract1.json"
-input_pcs = "./data/pointclouds/"
+output_files = "./fileout/out"
+#input_pcs = "./data/pointclouds/"
 
 # -- Structures to get the input elements:
 vertices = []
 faces = []
 json_boundaries = []
 json_vertices = []
-
-def yield_file(in_file):
-    f = open(in_file)
-    buf = f.read()
-    f.close()
-    for b in buf.split('\n'):
-        if b.startswith('v '):
-            yield ['v', [float(x) for x in b.split(" ")[1:]]]
-        elif b.startswith('f '):
-            triangles = b.split(' ')[1:]
-            yield ['f', [int(t.split("/")[0]) for t in triangles]]
-        else:
-            yield ['', ""]
-
-def read_obj(in_file):
-    for k, v in yield_file(in_file):
-        if k == 'v':
-            vertices.append(v)
-        elif k == 'f':
-            faces.append(v)
-
-    if not len(faces) or not len(vertices):
-        return None
 
 def read_json(in_file):
     f = open(in_file)
@@ -85,7 +61,6 @@ def npy_to_ply(all_pc):
     for pc in all_files:
         data = np.load(all_pc + pc)
         roof_obstacles.write_ply(data, './fileout/ply_pc/' + str(pc[:16]) + '.ply')
-        print("done")
 
 def main():
     # -- READ PLY: store the input 3D points in np array
@@ -93,25 +68,24 @@ def main():
     data = plydata.elements[0].data                         # read data
     data_pd = pd.DataFrame(data)                            # Convert to DataFrame, because DataFrame can parse structured data
 
-    # THIS KEEPS ALL PROPERTIES (nb of returns, etc)
+    # This keeps all properties (x, y, z, nx, ny, nz)
     point_cloud = np.zeros(data_pd.shape, dtype=np.float64)     # Initialize the array of stored data
     property_names = data[0].dtype.names                        # read the name of the property
     for i, name in enumerate(property_names):                   # Read data according to property, so as to ensure that the data read is the same data type.
         point_cloud[:, i] = data_pd[name]
 
-    # THIS KEEPS ONLY x,y,z
-    data_np = np.zeros((data_pd.shape[0], 3), dtype=float)  # Initialize the array of stored data
-    property_names = data[0].dtype.names
-    for i, name in enumerate(property_names):
-        if (i > 2): continue
-        data_np[:, i] = data_pd[name]
-
     # -- READ JSON: store the input in arrays
     read_json(input_json)
 
-    # -- detect obstacles
-    #npy_to_one_ply(input_pcs)
-    roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_file, input_json)
+    # -- Detect obstacles
+    geojson_part1 = roof_obstacles.detect_obstacles(point_cloud, json_vertices, json_boundaries, output_files, input_json)
+    
+    # -- Image classification
+
+    # -- Derge part 1 and part 2
+    
+    # -- CityJSON output
+    #write_json(input_json, output_file, dict_buildings)  
 
 
 
