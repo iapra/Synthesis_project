@@ -8,7 +8,6 @@ def filter_predict(predict, sigma=5):
     mask = skimage.filters.gaussian(predict, sigma=sigma)
     mask = mask > 0.3
     mask = skimage.filters.gaussian(mask, sigma=sigma)
-    mask = mask > 0.02
     result = (predict * mask) > 0.3
     result = skimage.filters.gaussian(result, sigma=sigma/3)
     result = result > 0.45
