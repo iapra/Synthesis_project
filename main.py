@@ -48,10 +48,10 @@ def read_json(in_file):
         json_vertices.append(coord)
 
     # Add transform to json_vertices
-    for vtx in json_vertices:
-        vtx[0] = (vtx[0] * data["transform"]["scale"][0]) + data["transform"]["translate"][0]
-        vtx[1] = (vtx[1] * data["transform"]["scale"][1]) + data["transform"]["translate"][1]
-        vtx[2] = (vtx[2] * data["transform"]["scale"][2]) + data["transform"]["translate"][2]
+    #for vtx in json_vertices:
+    #    vtx[0] = (vtx[0] * data["transform"]["scale"][0]) + data["transform"]["translate"][0]
+    #    vtx[1] = (vtx[1] * data["transform"]["scale"][1]) + data["transform"]["translate"][1]
+    #    vtx[2] = (vtx[2] * data["transform"]["scale"][2]) + data["transform"]["translate"][2]
 
 def read_ply(input_ply):
     plydata = PlyData.read(input_ply)                       # read file
